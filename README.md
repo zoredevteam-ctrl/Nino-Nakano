@@ -5,42 +5,39 @@
 
 # 🌸 **Nino Nakano** 🌸
 
-**¡Hmph! ¿Qué estás mirando, baka?**  
-No es como si hubiera hecho este bot *solo para ti*… pero bueno, aquí estoy.  
-La bot más tsundere, protectora y deliciosa de todo WhatsApp. 💖
+**¡Hmph! ¿Qué miras, baka?**  
+No es como si hubiera hecho este bot *solo para ti*… pero aquí estoy.  
+La bot más tsundere, directa y deliciosa de WhatsApp. 💖
 
-**¡Bienvenido al mundo de Nino Nakano!**  
-Soy la segunda de las quintillizas, la que cocina mejor que nadie, la que te dice las cosas a la cara y la que te protege aunque digas que no lo necesitas.  
-Este bot es **100% yo**: fuerte, directa, un poquito malcriada… y con un corazón más grande de lo que admito.
+**¡Bienvenido a Nino Nakano WhatsApp Bot!**  
+Soy la segunda de las quintillizas, la que cocina con amor (y un poco de picante), la que te dice las cosas como son y te protege aunque digas que no lo necesitas.  
+Este bot es **100% yo**: tsundere, protectora y con mucho estilo.
 
 [![Node.js](https://img.shields.io/badge/Node.js-339933?logo=node.js&logoColor=white&style=for-the-badge)](https://nodejs.org)
-[![Discord.js](https://img.shields.io/badge/Discord.js-5865F2?logo=discord&logoColor=white&style=for-the-badge)](https://discord.js.org)
+[![Baileys](https://img.shields.io/badge/Baileys-25D366?logo=whatsapp&logoColor=white&style=for-the-badge)](https://github.com/WhiskeySockets/Baileys)
 [![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black&style=for-the-badge)](https://developer.mozilla.org/es/docs/Web/JavaScript)
 
 </div>
 
-## ✨ ¿Por qué soy la mejor bot? ✨
+## ✨ ¿Por qué soy la mejor bot de WhatsApp? ✨
 
-- **Tsundere al 100%** — Te voy a tratar mal… pero en el fondo me importas (no lo digas en voz alta).
-- **Cocinera profesional** — Pídeme recetas, tips de cocina o simplemente dime que tienes hambre y te preparo algo rico.
-- **Protectora de hermanas** — Si alguien molesta a tus amigos, ¡yo me encargo! (modo mamá oso activado).
-- **Personalidad real** — Respondo como la verdadera Nino: directa, sarcástica y con mucho estilo.
-- **Comandos súper fáciles** y un montón de interacciones divertidas.
-- **Rápida, bonita y lista para ti** — 24/7 con la energía de una quintilliza.
+- **Tsundere al 100%** — Te trato mal… pero en el fondo me importas (no lo digas en voz alta, ¿entendido?).
+- **Personalidad real de Nino** — Respondo como la verdadera Nino Nakano: directa, sarcástica y con corazón.
+- **Rápida y escalable** — Hecha con Baileys (la mejor librería para WhatsApp).
+- **Fácil de usar** — Solo escaneas el QR y ya estoy lista para ti 24/7.
+- **Comandos divertidos** con mi toque quintilliza.
 
-## 📜 Comandos principales
+## 📜 Comandos disponibles (usa el prefijo `.`)
 
-| Comando          | Descripción                              | Ejemplo          |
-|------------------|------------------------------------------|------------------|
-| `/nino hola`     | Te saludo como solo yo sé                | `/nino hola`     |
-| `/cocinar`       | Te doy una receta deliciosa              | `/cocinar ramen` |
-| `/tsundere`      | Modo tsundere activado al máximo         | `/tsundere`      |
-| `/proteger`      | Activo mi modo protectora                | `/proteger @amigo` |
-| `/info`          | Todo sobre mí (y sobre las quintillizas) | `/info`          |
+| Comando     | Descripción                                      |
+|-------------|--------------------------------------------------|
+| `.menu`     | Muestra el menú completo (o `.help`)            |
+| `.ping`     | Comprueba si estoy viva (¡pong al instante!)    |
+| `.owner`    | Solo el dueño puede usarlo (para ti, creador 💜)|
 
-*(Hay muchos más… ¡descúbrelos tú mismo!)*
+*(Más comandos vienen pronto… ¡pídemelos y los agrego!)*
 
-## 🚀 Cómo poner a esta quintilliza en tu servidor
+## 🚀 Cómo poner a esta quintilliza en tu WhatsApp
 
 1. **Clona el repo**
    ```bash
@@ -53,43 +50,52 @@ Este bot es **100% yo**: fuerte, directa, un poquito malcriada… y con un coraz
    npm install
    ```
 
-3. **Configura tu bot**
-   - Renombra `settings.example.js` a `settings.js` (si no existe, créalo).
-   - Pon tu **token de WhatsApp** y demás datos.
+3. **Configura (si quieres)**
+   - Abre `settings.js` y ajusta tu número de owner, prefijo, nombre del bot, etc.
 
 4. **¡Enciéndeme!**
+   ```bash
+   npm start
+   ```
+   o
    ```bash
    node index.js
    ```
 
-5. **Invítame a tu servidor** con el link que te da la consola.
+5. **Escanea el QR**
+   - En la terminal aparecerá un código QR.
+   - Ábrelo con WhatsApp en tu celular → **Dispositivos vinculados** → **Vincular un dispositivo**.
+   - ¡Listo! Ya estoy conectada como Nino Nakano.
 
-¡Y listo! Ya tienes a la mejor quintilliza en tu WhatsApp.
+**Nota:** La sesión se guarda en la carpeta `session_nino` para que no tengas que escanear cada vez.
 
 ## 💕 Personalidad de Nino (para que nunca lo olvides)
 
-- Siempre honesta (aunque duela).
-- Cocina con amor… y un poquito de picante.
+- Siempre honesta (aunque duela un poquito).
 - Te dice “baka” pero te cuida.
-- No le gusta perder (ni que pierdas tú).
+- Cocina con amor… y responde con estilo.
+- No le gusta perder (y tampoco que pierdas tú).
 
 ## 🛠️ Tecnologías que uso
 
-- **Node.js** + **Discord.js v14**
-- Handlers limpios y fáciles de mantener
-- Totalmente personalizable (puedes cambiar mi personalidad si te atreves 😏)
+- **Node.js**
+- **@whiskeysockets/baileys** (la mejor para WhatsApp multi-dispositivo)
+- QR en terminal + sesión automática
+- Totalmente escalable y fácil de personalizar
 
 ## 📝 Notas importantes
 
 Este bot es **nuevo** y está hecho con mucho cariño por **zoredevteam-ctrl**.  
-Si quieres que sea aún más yo… ¡házmelo saber! Puedo mejorar, crecer y volverme todavía más tsundere.
+Versión actual: 1.0.0 (WhatsApp Bot Escalable - Nino Nakano Edition)
+
+Si quieres que sea aún más yo (más comandos, más tsundere, recetas de cocina, etc.)… ¡házmelo saber! Puedo mejorar y crecer contigo.
 
 ---
 
 <div align="center">
 
 **¡Gracias por elegirme!**  
-*(Aunque seguro que fue porque no pudiste resistirte a mi carita…)*
+*(Aunque seguro que fue porque no pudiste resistirte a mi carita… 😏)*
 
 **Hecho con 💖 por zoredevteam-ctrl para todos los fans de las quintillizas**
 
@@ -99,5 +105,3 @@ Si quieres que sea aún más yo… ¡házmelo saber! Puedo mejorar, crecer y vol
 **¡No te olvides de darme estrellita si te gusté!** 🌟
 
 </div>
-```
-
