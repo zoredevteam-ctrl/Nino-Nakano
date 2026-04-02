@@ -44,7 +44,7 @@ Si quieres desplegar tu propia instancia, sigue estos pasos:
 
  * Clonar el repositorio:
    git clone [https://github.com/zoredevteam-ctrl/Nino-Nakano)
-cd TU_REPOSIORIO
+cd Nino-Nakano
 
  * Instalar módulos de Node:
    npm install
