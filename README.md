@@ -43,7 +43,7 @@ Si quieres desplegar tu propia instancia, sigue estos pasos:
    pkg install nodejs-lts git ffmpeg imagemagick -y
 
  * Clonar el repositorio:
-   git clone [https://github.com/TU_USUARIO/TU_REPOSIORIO.git](https://github.com/TU_USUARIO/TU_REPOSIORIO.git)
+   git clone [https://github.com/zoredevteam-ctrl/Nino-Nakano)
 cd TU_REPOSIORIO
 
  * Instalar módulos de Node:
