@@ -2,15 +2,16 @@ const fs = require('fs');
 
 // Configuración de Identidad
 global.botName = 'Nino Nakano';
-global.ownerName = 'Z0RT SYSTEMS';
-global.ownerNumber = '573107400303'; // Tu número sin el @s.whatsapp.net
+global.ownerName = 'Z0RT SYSTEMS & Félix';
+// Lista de dueños autorizados
+global.owners = ['573107400303', '573508941325']; 
 global.prefix = '#';
 
 // Enlaces y Visuales
 global.rcanal = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y';
-global.banner = 'https://files.evogb.win/felix-nino-nakano.jpeg'; // Imagen de Nino 🦋
+global.banner = 'https://files.evogb.win/felix-nino-nakano.jpeg'; 
 
-// Mensajes de Sistema (Estilo Tsundere)
+// Mensajes de Sistema (Estilo Tsundere 🦋)
 global.mess = {
     wait: 'Un momento, no me apresures... 🦋',
     success: '¡Listo! Qué fácil fue. ✨',
@@ -25,7 +26,7 @@ global.mess = {
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
     fs.unwatchFile(file);
-    console.log('¡Actualizado settings.js!');
+    console.log('\x1b[32m%s\x1b[0m', '¡Actualizado settings.js! 🦋');
     delete require.cache[file];
     require(file);
 });
