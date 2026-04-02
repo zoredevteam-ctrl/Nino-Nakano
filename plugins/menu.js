@@ -3,12 +3,10 @@ const db = require('../lib/database');
 require('../settings');
 
 let handler = async (nino, m, { pushname, sender }) => {
-    // Cálculo de Ping
     const start = Date.now();
     const end = Date.now();
     const p = `${end - start}ms`;
 
-    // Cálculo de Uptime
     const uptimeSeconds = process.uptime();
     const d = Math.floor(uptimeSeconds / (3600 * 24));
     const h = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
@@ -16,18 +14,21 @@ let handler = async (nino, m, { pushname, sender }) => {
     const s = Math.floor(uptimeSeconds % 60);
     const uptime = `${d}d ${h}h ${min}m ${s}s`;
 
-    // Datos de Usuario y Globales
+    // ✅ FIX: Si el usuario no existe en la DB, lo inicializamos
+    if (!db.data.users[sender]) {
+        db.data.users[sender] = { limit: 10, xp: 0, level: 1 };
+    }
+
     const totalreg = Object.keys(db.data.users).length;
     const user = db.data.users[sender];
     const isOficial = true;
     const nombreBot = global.botName;
-    const username = pushname;
+    const username = pushname || 'Usuario';
     const currency = 'Limit';
-    const userMoney = user.limit || 0;
-    const userExp = user.xp || 0;
-    const userLevel = user.level || 1;
+    const userMoney = user?.limit ?? 0;
+    const userExp = user?.xp ?? 0;
+    const userLevel = user?.level ?? 1;
 
-    // Sistema de Rangos
     const getRango = (level) => {
         if (level < 5) return 'Novato';
         if (level < 15) return 'Aprendiz';
@@ -37,8 +38,8 @@ let handler = async (nino, m, { pushname, sender }) => {
     };
     const rango = getRango(userLevel);
 
-    // Ranking de Experiencia
-    const sortedExp = Object.entries(db.data.users).sort((a, b) => b[1].xp - a[1].xp);
+    // ✅ FIX: Protección si db.data.users está vacío o mal formado
+    const sortedExp = Object.entries(db.data.users || {}).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0));
     const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1;
     const rankText = `${rankIndex} / ${totalreg}`;
 
@@ -48,14 +49,14 @@ let handler = async (nino, m, { pushname, sender }) => {
 - ${nombreBot} es un bot privado. Si quieres tener el bot en tu grupo tienes que ser Sub-Bot con *(#code)* o unirte al canal.
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ ❐ ʚ˚₊‧ʚ˚₊‧ʚ˚
 
-*╭╼𝅄꒰𑁍⃪࣭۪ٜ݊݊݊݊݊໑ٜ࣪ ꒱ 𐔌 BOT - INFO 𐦯*
+*╭╼𝅄꒰𑁍⃪࣭۪ٜ݊݊݊݊݊໑ٜ࣪ ꒱ 𐔌 BOT - INFO 𐦯*
 *|✎ Creador:* 𝓐𝓪𝓻𝓸𝓶
 *|✎ Users:* ${totalreg.toLocaleString()}
 *|✎ Uptime:* ${uptime}
 *|✎ Ping:* ${p}
 *|✎ Baileys:* Multi-Device
 *|✎ Canal:* ${global.rcanal}
-*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🦋⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🦋⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *╭╼𝅄꒰✧: ꒱ 𐔌 INFO - USER 𐦯*
 *|✎ Nombre:* ${username}
@@ -64,16 +65,16 @@ let handler = async (nino, m, { pushname, sender }) => {
 *|✎ Rango:* ${rango}
 *|✎ Nivel:* ${userLevel}
 *|✎ Top:* ${rankText}
-*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🎀⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🎀⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦*
 
-*꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 SISTEMA 𐦯*
+*꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 SISTEMA 𐦯*
 > *✧･ﾟ: ❏ #p*
 > *✧･ﾟ: ❏ #ping*
 > *✧･ﾟ: ❏ #owner*
 
-*꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 GRUPOS 𐦯*
+*꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 GRUPOS 𐦯*
 > *✧･ﾟ: ❏ #kick*
 > *✧･ﾟ: ❏ #ban*`;
 
