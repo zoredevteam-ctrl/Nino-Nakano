@@ -2,19 +2,13 @@
 node_modules/
 npm-debug.log
 yarn-error.log
-
-
 session_nino/
 store.json
 baileys_store.json
-
-
 .env
-# Logs y archivos temporales
 *.log
 logs/
 temp/
-
-# Archivos ocultos del sistema operativo (Mac/Windows)
+ (Mac/Windows)
 .DS_Store
 Thumbs.db
