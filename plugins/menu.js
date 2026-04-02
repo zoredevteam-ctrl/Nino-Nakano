@@ -3,10 +3,12 @@ const db = require('../lib/database');
 require('../settings');
 
 let handler = async (nino, m, { pushname, sender }) => {
+    // Cálculo de Ping
     const start = Date.now();
     const end = Date.now();
     const p = `${end - start}ms`;
 
+    // Cálculo de Uptime
     const uptimeSeconds = process.uptime();
     const d = Math.floor(uptimeSeconds / (3600 * 24));
     const h = Math.floor((uptimeSeconds % (3600 * 24)) / 3600);
@@ -14,6 +16,7 @@ let handler = async (nino, m, { pushname, sender }) => {
     const s = Math.floor(uptimeSeconds % 60);
     const uptime = `${d}d ${h}h ${min}m ${s}s`;
 
+    // Datos de Usuario y Globales
     const totalreg = Object.keys(db.data.users).length;
     const user = db.data.users[sender];
     const isOficial = true;
@@ -24,24 +27,25 @@ let handler = async (nino, m, { pushname, sender }) => {
     const userExp = user.xp || 0;
     const userLevel = user.level || 1;
 
-    const sortedExp = Object.entries(db.data.users).sort((a, b) => b[1].xp - a[1].xp);
-    const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1;
-    const rankText = `${rankIndex} / ${totalreg}`;
-
+    // Sistema de Rangos
     const getRango = (level) => {
         if (level < 5) return 'Novato';
         if (level < 15) return 'Aprendiz';
         if (level < 30) return 'Guerrero';
         if (level < 50) return 'Élite';
-        if (level < 100) return 'Maestro';
         return 'Nino Lover';
     };
     const rango = getRango(userLevel);
 
+    // Ranking de Experiencia
+    const sortedExp = Object.entries(db.data.users).sort((a, b) => b[1].xp - a[1].xp);
+    const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1;
+    const rankText = `${rankIndex} / ${totalreg}`;
+
     let txt = `¡𝐇𝐨𝐥𝐚! Soy *${nombreBot}* ${isOficial ? '(OficialBot)' : '(Sub-Bot)'}
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
-- ${nombreBot} es un bot privado, el cual el bot principal no se unirá a tus grupos. Si quieres tener el bot en tu grupo tienes que ser Sub-Bot con *(#code)*
+- ${nombreBot} es un bot privado. Si quieres tener el bot en tu grupo tienes que ser Sub-Bot con *(#code)* o unirte al canal.
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ ❐ ʚ˚₊‧ʚ˚₊‧ʚ˚
 
 *╭╼𝅄꒰𑁍⃪࣭۪ٜ݊݊݊݊݊໑ٜ࣪ ꒱ 𐔌 BOT - INFO 𐦯*
@@ -50,7 +54,7 @@ let handler = async (nino, m, { pushname, sender }) => {
 *|✎ Uptime:* ${uptime}
 *|✎ Ping:* ${p}
 *|✎ Baileys:* Multi-Device
-*|✎ Comandos:* https://github.com/Z0RT-SYSTEMS
+*|✎ Canal:* ${global.rcanal}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🦋⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *╭╼𝅄꒰✧: ꒱ 𐔌 INFO - USER 𐦯*
@@ -62,23 +66,25 @@ let handler = async (nino, m, { pushname, sender }) => {
 *|✎ Top:* ${rankText}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ࣪࣪࣪۬◌⃘۪֟፝֯۫۫︎⃪𐇽۫۬🎀⃘۪֟፝֯۫۫۫۬◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*➪ 𝗟𝗜𝗦𝗧𝗔*
-       *➪  𝗗𝗘*
-           *➪ 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦*
+*➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦*
 
 *꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 SISTEMA 𐦯*
 > *✧･ﾟ: ❏ #p*
 > *✧･ﾟ: ❏ #ping*
-> *✧･ﾟ: ❏ #owner*`;
+> *✧･ﾟ: ❏ #owner*
+
+*꒰⌢◌⃘࣭ٜ࣪࣪࣪۬☪︎︎︎︎̸ ♡  ꒱ 𐔌 GRUPOS 𐦯*
+> *✧･ﾟ: ❏ #kick*
+> *✧･ﾟ: ❏ #ban*`;
 
     await nino.sendMessage(m.key.remoteJid, { 
         text: txt,
         contextInfo: {
             externalAdReply: {
-                title: nombreBot,
-                body: 'Butterfly System Edition',
-                thumbnailUrl: 'https://i.pinimg.com/736x/8e/3c/6d/8e3c6d37019842f132f831968846c483.jpg',
-                sourceUrl: 'https://github.com/',
+                title: `🦋 ${nombreBot} - MultiDevice 🦋`,
+                body: 'Sigue mi canal oficial aquí',
+                thumbnailUrl: global.banner,
+                sourceUrl: global.rcanal,
                 mediaType: 1,
                 renderLargerThumbnail: true
             }
