@@ -14,7 +14,7 @@
 
 ## 🌹 ¿Qué es Nino Nakano Bot?
 
-**Nino Nakano** es un bot de WhatsApp modular y de alto rendimiento, diseñado bajo la arquitectura de **Z0RT SYSTEMS**. No es solo un bot común; está enfocado en la gestión de grupos, entretenimiento y personalización extrema con una estética cyberpunk/anime.
+**Nino Nakano** es un bot de WhatsApp modular y de alto rendimiento, diseñado bajo la arquitectura de **𝓐𝓪𝓻𝓸𝓶**. No es solo un bot común; está enfocado en la gestión de grupos, entretenimiento y personalización extrema con una estética cyberpunk/anime.
 
 > "No creas que estoy aquí para ayudarte porque quiero... ¡solo asegúrate de usarme bien, tonto!" — *Nino.*
 
