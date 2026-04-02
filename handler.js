@@ -7,12 +7,17 @@ require('./settings');
 
 const plugins = {};
 const pluginsFolder = path.join(__dirname, 'plugins');
-const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'));
 
-for (const file of pluginFiles) {
-    const plugin = require(path.join(pluginsFolder, file));
-    plugins[file] = plugin;
-}
+const loadPlugins = () => {
+    const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'));
+    for (const file of pluginFiles) {
+        const pluginPath = path.join(pluginsFolder, file);
+        delete require.cache[require.resolve(pluginPath)];
+        plugins[file] = require(pluginPath);
+    }
+};
+
+loadPlugins();
 
 module.exports = async (nino, chatUpdate) => {
     try {
@@ -48,8 +53,21 @@ module.exports = async (nino, chatUpdate) => {
                 level: 1,
                 premium: false,
                 limit: 20,
-                warn: 0
+                warn: 0,
+                lastChat: Date.now()
             };
+            db.save();
+        } else {
+            db.data.users[sender].xp += Math.floor(Math.random() * 10);
+            db.data.users[sender].lastChat = Date.now();
+            
+            let user = db.data.users[sender];
+            let requiredXp = user.level * 100;
+            if (user.xp >= requiredXp) {
+                user.level += 1;
+                user.xp = 0;
+                await nino.sendMessage(from, { text: `🦋 ¡Vaya, tonto! Subiste al nivel *${user.level}*. Sigue así...` }, { quoted: m });
+            }
             db.save();
         }
 
@@ -66,34 +84,17 @@ module.exports = async (nino, chatUpdate) => {
                         text, 
                         isOwner, 
                         isGroup, 
-                        pushname 
+                        pushname,
+                        command
                     });
                     executed = true;
                     break;
                 }
             }
-
-            if (!executed) {
-                switch (command) {
-                    case 'menu':
-                    case 'help':
-                        let menuText = `🦋 *NINO NAKANO SYSTEM* 🦋\n\n`;
-                        menuText += `╭─── • *USUARIO* • ───\n`;
-                        menuText += `│ 👤 *Nombre:* ${pushname}\n`;
-                        menuText += `│ 📊 *Nivel:* ${db.data.users[sender].level}\n`;
-                        menuText += `╰────────────────────\n\n`;
-                        menuText += `╭─── • *COMANDOS* • ───\n`;
-                        menuText += `│ ✨ ${global.prefix}ping / ${global.prefix}p\n`;
-                        menuText += `│ 👤 ${global.prefix}owner\n`;
-                        menuText += `╰────────────────────`;
-                        await nino.sendMessage(from, { text: menuText }, { quoted: m });
-                        break;
-                }
-            }
         }
     } catch (err) {
-        console.error(err);
-        const from = chatUpdate.messages[0].key.remoteJid;
-        await nino.sendMessage(from, { text: global.mess.error });
+        console.error('CRITICAL_HANDLER_ERROR:', err);
+        const from = chatUpdate.messages[0]?.key?.remoteJid;
+        if (from) await nino.sendMessage(from, { text: global.mess.error });
     }
 };
