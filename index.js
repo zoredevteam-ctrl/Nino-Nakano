@@ -36,7 +36,7 @@ async function startNino() {
     ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝`));
     console.log(chalk.white.bold('                 power by 𝓐𝓪𝓻𝓸𝓶\n'));
     console.log(chalk.gray(`Motor: Baileys v${version.join('.')} ${isLatest ? '(Actualizado)' : ''}\n`));
-    
+
     let method = 0;
     if (!state.creds.registered) {
         console.log(chalk.cyan('Selecciona el método de vinculación:'));
@@ -45,7 +45,6 @@ async function startNino() {
         method = await question(chalk.magenta('\nOpcion > '));
     }
 
-    // Configuración optimizada del Socket
     const nino = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
@@ -64,14 +63,12 @@ async function startNino() {
         console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
     }
 
-    // GESTOR DE DESCONEXIONES Y AUTO-LIMPIEZA
     nino.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
-        
+
         if (connection === 'close') {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
-            
-            // 🚨 ELIMINACIÓN AUTOMÁTICA DE SESIÓN 🚨
+
             if (reason === DisconnectReason.loggedOut || reason === DisconnectReason.badSession) { 
                 console.log(chalk.red.bold(`\n❌ Sesión cerrada o corrupta detectada.`)); 
                 try {
@@ -81,18 +78,30 @@ async function startNino() {
                     console.log(chalk.red('⚠️ No se pudo borrar la carpeta automáticamente.'));
                 }
                 console.log(chalk.cyan('🔄 Ejecuta "npm start" de nuevo para generar una nueva sesión.'));
-                process.exit(0); // Cierra el proceso para evitar un bucle de crasheos
+                process.exit(0);
             } 
-            // RECONEXIONES NORMALES
-            else if (reason === DisconnectReason.connectionClosed) { console.log(chalk.yellow("Conexión cerrada, reconectando...")); startNino(); }
-            else if (reason === DisconnectReason.connectionLost) { console.log(chalk.yellow("Conexión perdida, reconectando...")); startNino(); }
+            else if (reason === DisconnectReason.connectionClosed) { 
+                console.log(chalk.yellow("Conexión cerrada, reconectando..."));
+                setTimeout(() => startNino(), 3000); // ✅ Espera antes de reconectar
+            }
+            else if (reason === DisconnectReason.connectionLost) { 
+                console.log(chalk.yellow("Conexión perdida, reconectando..."));
+                setTimeout(() => startNino(), 3000);
+            }
             else if (reason === DisconnectReason.connectionReplaced) { 
                 console.log(chalk.red("Sesión reemplazada. Cierra la otra conexión.")); 
                 process.exit(0); 
             }
-            else if (reason === DisconnectReason.restartRequired) { console.log(chalk.cyan("Reinicio requerido por el servidor...")); startNino(); }
-            else { console.log(chalk.white(`Desconexión desconocida: ${reason}`)); startNino(); }
-            
+            else if (reason === DisconnectReason.restartRequired) { 
+                console.log(chalk.cyan("Reinicio requerido por el servidor..."));
+                setTimeout(() => startNino(), 3000);
+            }
+            else { 
+                console.log(chalk.white(`Desconexión desconocida: ${reason}`));
+                // ✅ FIX: Timeout para evitar bucle infinito de reconexiones
+                setTimeout(() => startNino(), 5000);
+            }
+
         } else if (connection === 'open') {
             console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista para operar! 🦋\n'));
         }
@@ -100,7 +109,6 @@ async function startNino() {
 
     nino.ev.on('creds.update', saveCreds);
 
-    // SISTEMA DE BIENVENIDA
     nino.ev.on('group-participants.update', async (anu) => {
         try {
             const metadata = await nino.groupMetadata(anu.id);
@@ -149,7 +157,6 @@ async function startNino() {
         }
     });
 
-    // ENRUTADOR DE MENSAJES
     nino.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             await handler(nino, chatUpdate);
