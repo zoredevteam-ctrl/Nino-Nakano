@@ -1,123 +1,114 @@
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
+import './settings.js'
+import fs from 'fs'
+import path from 'path'
+import chalk from 'chalk'
+import { fileURLToPath } from 'url'
 
-try {
-    require('./settings');
-} catch (e) {
-    console.log(chalk.red('Error: No se pudo cargar settings.js'));
-}
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
-// ====================== PRE-CARGA DE PLUGINS ======================
-const pluginDir = path.join(__dirname, 'plugins');
-const pluginFiles = fs.readdirSync(pluginDir).filter(file => file.endsWith('.js'));
-
-global.allPlugins = [];
-
-console.log(chalk.hex('#FF69B4').bold('\n🚀 Cargando plugins de Nino Nakano...\n'));
-
-for (let file of pluginFiles) {
+/**
+ * Handler principal de mensajes
+ * @param {import('@whiskeysockets/baileys').proto.IWebMessageInfo} m - Mensaje procesado por smsg
+ * @param {import('@whiskeysockets/baileys').WASocket} conn - Conexión del bot
+ * @param {Map} plugins - Mapa de plugins cargados en index.js
+ */
+export async function handler(m, conn, plugins) {
     try {
-        const plugin = require(path.join(pluginDir, file));
+        if (!m || !m.message) return
+        if (m.isBaileys) return // Ignorar mensajes de otros bots Baileys
         
-        if (!plugin || !plugin.command) {
-            console.log(chalk.yellow(`[⚠️] ${file} no tiene comando definido`));
-            continue;
-        }
+        // Configuración básica
+        const prefix = global.prefix || '#'
+        const body = m.body || ''
+        const isCmd = body.startsWith(prefix)
+        const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : ''
+        const args = body.trim().split(/ +/).slice(1)
+        const text = args.join(' ')
+        const from = m.chat
+        const sender = m.sender
+        const senderNumber = sender.split('@')[0]
 
-        global.allPlugins.push(plugin);
-        
-        const cmds = Array.isArray(plugin.command) 
-            ? plugin.command.join(', ') 
-            : plugin.command;
-        
-        console.log(chalk.green(`[✓] ${file} → ${cmds}`));
-    } catch (err) {
-        console.error(chalk.red(`[✗] Error cargando ${file}: ${err.message}`));
-    }
-}
+        // --- LÓGICA DE PERMISOS ---
+        const owners = Array.isArray(global.owner) ? global.owner.map(o => o[0]) : []
+        const isOwner = owners.includes(senderNumber) || m.fromMe
 
-console.log(chalk.hex('#FF69B4').bold(`\n✅ ${global.allPlugins.length} plugins cargados correctamente\n`));
-// ================================================================
+        const groupMetadata = m.isGroup ? await conn.groupMetadata(from).catch(() => ({})) : {}
+        const participants = m.isGroup ? (groupMetadata.participants || []) : []
+        const userAdmin = m.isGroup ? !!participants.find(p => p.id === sender)?.admin : false
+        const botAdmin = m.isGroup ? !!participants.find(p => p.id === (conn.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false
 
-module.exports = async (nino, chatUpdate) => {
-    try {
-        const m = chatUpdate.messages[0];
-        if (!m || !m.message) return;
-
-        if (m.key.fromMe) return;
-        if (m.key.remoteJid === 'status@broadcast') return;
-
-        const from = m.key.remoteJid;
-        const type = Object.keys(m.message)[0];
-        const sender = m.key.participant || m.key.remoteJid;
-        const senderNumber = sender ? sender.split('@')[0] : '';
-
-        // EXTRACCIÓN DE TEXTO
-        const body = (type === 'conversation') ? m.message.conversation : 
-                     (type === 'extendedTextMessage') ? m.message.extendedTextMessage?.text : 
-                     (type === 'imageMessage') ? m.message.imageMessage?.caption : 
-                     (type === 'videoMessage') ? m.message.videoMessage?.caption : '';
-
-        if (!body) return;
-
-        const prefix = global.prefix || '#';
-        const isCmd = body.startsWith(prefix);
-        const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
-        const args = body.trim().split(/ +/).slice(1);
-        const text = args.join(' ');
-
-        const owners = Array.isArray(global.owners) ? global.owners : [];
-        const isOwner = owners.includes(senderNumber);
-
-        const isGroup = from.endsWith('@g.us');
-        const groupMetadata = isGroup ? await nino.groupMetadata(from).catch(() => ({})) : {};
-        const participants = isGroup ? (groupMetadata.participants || []) : [];
-        const userAdmin = isGroup ? !!participants.find(p => p.id === sender)?.admin : false;
-        const botAdmin = isGroup ? !!participants.find(p => p.id === (nino.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false;
-
+        // --- LOG DE COMANDOS EN CONSOLA ---
         if (isCmd) {
-            console.log(chalk.hex('#FF69B4').bold(`[ CMD ] \( {prefix} \){command} | Usuario: ${senderNumber}`));
+            console.log(
+                chalk.hex('#FF69B4').bold(`[ CMD ] `) + 
+                chalk.white(`${prefix}${command}`) + 
+                chalk.hex('#DDA0DD')(` | De: ${m.pushName || senderNumber}`) +
+                (m.isGroup ? chalk.yellow(` en ${groupMetadata.subject || 'Grupo'}`) : chalk.green(' (DM)'))
+            );
         }
 
-        if (!isCmd || !command) return;
+        if (!isCmd || !command) return
 
-        // EJECUCIÓN DE PLUGINS (versión optimizada)
-        for (let plugin of global.allPlugins) {
-            try {
-                const matched = Array.isArray(plugin.command)
-                    ? plugin.command.some(cmd => cmd.toLowerCase() === command)
-                    : plugin.command.toLowerCase() === command;
+        // --- EJECUCIÓN DE PLUGINS ---
+        let executed = false
+        for (let name in plugins) {
+            let plugin = plugins[name]
+            if (!plugin) continue
 
-                if (matched) {
-                    await plugin(nino, m, {
-                        from,
-                        isGroup,
-                        isOwner,
-                        userAdmin,
-                        botAdmin,
+            // Verificar si el comando coincide (soporta string o array)
+            const matched = Array.isArray(plugin.command)
+                ? plugin.command.some(cmd => cmd.toLowerCase() === command)
+                : plugin.command?.toLowerCase() === command
+
+            if (matched) {
+                executed = true
+                
+                // --- SISTEMA DE RESTRICCIONES ---
+                if (plugin.owner && !isOwner) {
+                    return m.reply('🦋 *¡Oye!* Solo mi creador Aarom puede usar este comando. No seas entrometido/a. 💅')
+                }
+                if (plugin.group && !m.isGroup) {
+                    return m.reply('🦋 Este comando es exclusivo para grupos. ¡Búscate amigos! 🙄')
+                }
+                if (plugin.admin && !userAdmin && !isOwner) {
+                    return m.reply('🦋 Necesitas ser *Admin* para darme órdenes aquí. ¡Aprende tu lugar! 💢')
+                }
+                if (plugin.botAdmin && !botAdmin) {
+                    return m.reply('🦋 ¡Hazme Admin primero! No puedo hacer nada si no tengo poder en el grupo. ✨')
+                }
+
+                try {
+                    await plugin.call(conn, m, {
+                        conn,
+                        m,
                         args,
                         text,
-                        sender,
+                        command,
+                        isOwner,
+                        isGroup: m.isGroup,
+                        userAdmin,
+                        botAdmin,
+                        participants,
+                        groupMetadata,
                         pushname: m.pushName || 'Usuario'
-                    });
-                    return; // solo ejecuta el primer plugin que coincida
+                    })
+                } catch (err) {
+                    console.error(chalk.red(`[ERROR PLUGIN ${name}]:`), err)
+                    m.reply(`🦋 *¡Ugh!* Algo salió mal ejecutando el comando: \`${err.message}\``)
                 }
-            } catch (err) {
-                console.error(chalk.red(`Error ejecutando plugin: ${err.message}`));
+                break // Detener búsqueda después de encontrar el comando
             }
         }
 
     } catch (err) {
-        console.log(chalk.bgRed.white(' ERROR EN HANDLER '), chalk.red(err.stack));
+        console.error(chalk.bgRed.white(' ERROR CRÍTICO EN HANDLER '), err)
     }
-};
+}
 
-// Hot reload del handler
-let file = require.resolve(__filename);
+// --- LOG DE RECARGA ---
+let file = fileURLToPath(import.meta.url)
 fs.watchFile(file, () => {
-    fs.unwatchFile(file);
-    console.log(chalk.green('Handler actualizado → recargando...'));
-    delete require.cache[file];
-    require(file);
-});
+    fs.unwatchFile(file)
+    console.log(chalk.hex('#FF69B4')('🦋 Handler.js actualizado. Aplicando cambios...'))
+})
