@@ -18,7 +18,7 @@ const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
 async function startNino() {
     const { state, saveCreds } = await useMultiFileAuthState('./session_nino');
-    const { version } = await fetchLatestBaileysVersion();
+    const { version, isLatest } = await fetchLatestBaileysVersion();
 
     console.clear();
     console.log(chalk.hex('#FF69B4').bold(`
@@ -35,6 +35,7 @@ async function startNino() {
     ██║ ╚████║██║  ██║██║  ██╗██║  ██║██║ ╚████║╚██████╔╝
     ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝`));
     console.log(chalk.white.bold('                 power by 𝓐𝓪𝓻𝓸𝓶\n'));
+    console.log(chalk.gray(`Motor: Baileys v${version.join('.')} ${isLatest ? '(Actualizado)' : ''}\n`));
     
     let method = 0;
     if (!state.creds.registered) {
@@ -44,12 +45,17 @@ async function startNino() {
         method = await question(chalk.magenta('\nOpcion > '));
     }
 
+    // Configuración optimizada del Socket
     const nino = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: method === '2',
         auth: state,
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        browser: ["Z0RT SYSTEMS", "Chrome", "2.0.0"],
+        generateHighQualityLinkPreview: true,
+        getMessage: async (key) => {
+            return { conversation: 'Nino Nakano está procesando este mensaje...' };
+        }
     });
 
     if (method === '1' && !nino.authState.creds.registered) {
@@ -58,17 +64,35 @@ async function startNino() {
         console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
     }
 
+    // GESTOR DE DESCONEXIONES Y AUTO-LIMPIEZA
     nino.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
+        
         if (connection === 'close') {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
-            if (reason === DisconnectReason.badSession) { console.log(chalk.red(`Sesión corrupta, elimina la carpeta session_nino y escanea de nuevo.`)); startNino(); }
+            
+            // 🚨 ELIMINACIÓN AUTOMÁTICA DE SESIÓN 🚨
+            if (reason === DisconnectReason.loggedOut || reason === DisconnectReason.badSession) { 
+                console.log(chalk.red.bold(`\n❌ Sesión cerrada o corrupta detectada.`)); 
+                try {
+                    fs.rmSync('./session_nino', { recursive: true, force: true });
+                    console.log(chalk.yellow('🗑️ Carpeta session_nino eliminada automáticamente.'));
+                } catch (e) {
+                    console.log(chalk.red('⚠️ No se pudo borrar la carpeta automáticamente.'));
+                }
+                console.log(chalk.cyan('🔄 Ejecuta "npm start" de nuevo para generar una nueva sesión.'));
+                process.exit(0); // Cierra el proceso para evitar un bucle de crasheos
+            } 
+            // RECONEXIONES NORMALES
             else if (reason === DisconnectReason.connectionClosed) { console.log(chalk.yellow("Conexión cerrada, reconectando...")); startNino(); }
             else if (reason === DisconnectReason.connectionLost) { console.log(chalk.yellow("Conexión perdida, reconectando...")); startNino(); }
-            else if (reason === DisconnectReason.connectionReplaced) { console.log(chalk.red("Sesión reemplazada, cierra la otra sesión primero.")); nino.logout(); }
-            else if (reason === DisconnectReason.loggedOut) { console.log(chalk.red(`Sesión cerrada, elimina session_nino y escanea de nuevo.`)); nino.logout(); }
-            else if (reason === DisconnectReason.restartRequired) { console.log(chalk.cyan("Reinicio requerido...")); startNino(); }
+            else if (reason === DisconnectReason.connectionReplaced) { 
+                console.log(chalk.red("Sesión reemplazada. Cierra la otra conexión.")); 
+                process.exit(0); 
+            }
+            else if (reason === DisconnectReason.restartRequired) { console.log(chalk.cyan("Reinicio requerido por el servidor...")); startNino(); }
             else { console.log(chalk.white(`Desconexión desconocida: ${reason}`)); startNino(); }
+            
         } else if (connection === 'open') {
             console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista para operar! 🦋\n'));
         }
@@ -76,17 +100,15 @@ async function startNino() {
 
     nino.ev.on('creds.update', saveCreds);
 
+    // SISTEMA DE BIENVENIDA
     nino.ev.on('group-participants.update', async (anu) => {
         try {
             const metadata = await nino.groupMetadata(anu.id);
             const participants = anu.participants;
             for (let num of participants) {
                 let ppuser;
-                try { 
-                    ppuser = await nino.profilePictureUrl(num, 'image'); 
-                } catch { 
-                    ppuser = global.banner; 
-                }
+                try { ppuser = await nino.profilePictureUrl(num, 'image'); } 
+                catch { ppuser = global.banner; }
 
                 if (anu.action === 'add') {
                     let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`;
@@ -123,15 +145,16 @@ async function startNino() {
                 }
             }
         } catch (err) { 
-            console.log('Error en Welcome System:', err); 
+            console.log('Error en Welcome System:', err.message); 
         }
     });
 
+    // ENRUTADOR DE MENSAJES
     nino.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             await handler(nino, chatUpdate);
         } catch (err) {
-            console.error('Error en Handler:', err);
+            console.error(chalk.red('Error crítico enviando al Handler:'), err.message);
         }
     });
 }
