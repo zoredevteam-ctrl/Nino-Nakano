@@ -5,8 +5,40 @@ const chalk = require('chalk');
 try {
     require('./settings');
 } catch (e) {
-    console.log(chalk.red('❌ Error: No se pudo cargar settings.js'));
+    console.log(chalk.red('Error: No se pudo cargar settings.js'));
 }
+
+// ====================== PRE-CARGA DE PLUGINS ======================
+const pluginDir = path.join(__dirname, 'plugins');
+const pluginFiles = fs.readdirSync(pluginDir).filter(file => file.endsWith('.js'));
+
+global.allPlugins = [];
+
+console.log(chalk.hex('#FF69B4').bold('\n🚀 Cargando plugins de Nino Nakano...\n'));
+
+for (let file of pluginFiles) {
+    try {
+        const plugin = require(path.join(pluginDir, file));
+        
+        if (!plugin || !plugin.command) {
+            console.log(chalk.yellow(`[⚠️] ${file} no tiene comando definido`));
+            continue;
+        }
+
+        global.allPlugins.push(plugin);
+        
+        const cmds = Array.isArray(plugin.command) 
+            ? plugin.command.join(', ') 
+            : plugin.command;
+        
+        console.log(chalk.green(`[✓] ${file} → ${cmds}`));
+    } catch (err) {
+        console.error(chalk.red(`[✗] Error cargando ${file}: ${err.message}`));
+    }
+}
+
+console.log(chalk.hex('#FF69B4').bold(`\n✅ ${global.allPlugins.length} plugins cargados correctamente\n`));
+// ================================================================
 
 module.exports = async (nino, chatUpdate) => {
     try {
@@ -27,7 +59,6 @@ module.exports = async (nino, chatUpdate) => {
                      (type === 'imageMessage') ? m.message.imageMessage?.caption : 
                      (type === 'videoMessage') ? m.message.videoMessage?.caption : '';
 
-        // ✅ FIX: Ignorar mensajes sin texto (stickers, reacciones, audios, etc.)
         if (!body) return;
 
         const prefix = global.prefix || '#';
@@ -46,35 +77,34 @@ module.exports = async (nino, chatUpdate) => {
         const botAdmin = isGroup ? !!participants.find(p => p.id === (nino.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false;
 
         if (isCmd) {
-            console.log(chalk.hex('#FF69B4').bold(`[ CMD ] ${prefix}${command} | Usuario: ${senderNumber}`));
+            console.log(chalk.hex('#FF69B4').bold(`[ CMD ] \( {prefix} \){command} | Usuario: ${senderNumber}`));
         }
 
-        // ✅ FIX: Solo ejecutar plugins si hay un comando
         if (!isCmd || !command) return;
 
-        const pluginPath = path.join(__dirname, 'plugins');
-        const files = fs.readdirSync(pluginPath).filter(f => f.endsWith('.js'));
-
-        for (let file of files) {
+        // EJECUCIÓN DE PLUGINS (versión optimizada)
+        for (let plugin of global.allPlugins) {
             try {
-                const plugin = require(path.join(pluginPath, file));
-
-                // ✅ FIX: Validación segura para evitar el error de includes
-                if (!plugin || !plugin.command) continue;
-
                 const matched = Array.isArray(plugin.command)
-                    ? plugin.command.includes(command)
-                    : plugin.command === command;
+                    ? plugin.command.some(cmd => cmd.toLowerCase() === command)
+                    : plugin.command.toLowerCase() === command;
 
                 if (matched) {
                     await plugin(nino, m, {
-                        from, isGroup, isOwner, userAdmin, botAdmin, args, text, sender,
+                        from,
+                        isGroup,
+                        isOwner,
+                        userAdmin,
+                        botAdmin,
+                        args,
+                        text,
+                        sender,
                         pushname: m.pushName || 'Usuario'
                     });
+                    return; // solo ejecuta el primer plugin que coincida
                 }
             } catch (err) {
-                // ✅ FIX: Solo log en consola, NUNCA mensajes al chat
-                console.error(chalk.red(`Error en plugin ${file}: ${err.message}`));
+                console.error(chalk.red(`Error ejecutando plugin: ${err.message}`));
             }
         }
 
@@ -83,10 +113,11 @@ module.exports = async (nino, chatUpdate) => {
     }
 };
 
+// Hot reload del handler
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
     fs.unwatchFile(file);
-    console.log(chalk.green('¡Handler actualizado! 🦋'));
+    console.log(chalk.green('Handler actualizado → recargando...'));
     delete require.cache[file];
     require(file);
 });
