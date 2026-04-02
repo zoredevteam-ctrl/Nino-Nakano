@@ -21,28 +21,35 @@ loadPlugins();
 
 module.exports = async (nino, chatUpdate) => {
     try {
-        const m = chatUpdate.messages[0];
+        const m = chatUpdate?.messages?.[0];
         if (!m || !m.message) return;
-        if (m.key && m.key.remoteJid === 'status@broadcast') return;
+        if (m.key?.remoteJid === 'status@broadcast') return;
 
         const from = m.key.remoteJid;
         const type = Object.keys(m.message)[0];
-        const content = type === 'conversation' ? m.message.conversation
-                      : type === 'extendedTextMessage' ? m.message.extendedTextMessage.text
-                      : type === 'imageMessage' ? m.message.imageMessage.caption
-                      : type === 'videoMessage' ? m.message.videoMessage.caption : '';
+
+        const content = (
+            type === 'conversation' ? m.message.conversation :
+            type === 'extendedTextMessage' ? m.message.extendedTextMessage?.text :
+            type === 'imageMessage' ? m.message.imageMessage?.caption :
+            type === 'videoMessage' ? m.message.videoMessage?.caption :
+            ''
+        ) || '';
 
         const sender = decodeJid(m.key.participant || m.key.remoteJid);
-        const senderNumber = sender.split('@')[0];
+        const senderNumber = (sender || '').split('@')[0];
         const isGroup = from.endsWith('@g.us');
         const pushname = m.pushName || 'Usuario';
 
-        const isCmd = content.startsWith(global.prefix);
-        const command = isCmd ? content.slice(global.prefix.length).trim().split(' ').shift().toLowerCase() : '';
+        const prefix = typeof global.prefix === 'string' ? global.prefix : '.';
+        const ownerNumbers = Array.isArray(global.ownerNumber) ? global.ownerNumber : [];
+
+        const isCmd = content.startsWith(prefix);
+        const command = isCmd ? content.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
         const args = content.trim().split(/ +/).slice(1);
         const text = args.join(' ');
-        
-        const isOwner = global.ownerNumber.includes(senderNumber);
+
+        const isOwner = ownerNumbers.includes(senderNumber);
 
         printLog(isCmd, senderNumber, isGroup ? 'Grupo' : null, content);
 
@@ -60,30 +67,36 @@ module.exports = async (nino, chatUpdate) => {
         } else {
             db.data.users[sender].xp += Math.floor(Math.random() * 10);
             db.data.users[sender].lastChat = Date.now();
-            
-            let user = db.data.users[sender];
-            let requiredXp = user.level * 100;
+
+            const user = db.data.users[sender];
+            const requiredXp = user.level * 100;
+
             if (user.xp >= requiredXp) {
                 user.level += 1;
                 user.xp = 0;
-                await nino.sendMessage(from, { text: `🦋 ¡Vaya, tonto! Subiste al nivel *${user.level}*. Sigue así...` }, { quoted: m });
+                await nino.sendMessage(from, {
+                    text: `🦋 ¡Subiste al nivel *${user.level}*!`
+                }, { quoted: m });
             }
+
             db.save();
         }
 
         if (isCmd) {
             let executed = false;
+
             for (const name in plugins) {
                 const plugin = plugins[name];
-                if (plugin.command && plugin.command.includes(command)) {
-                    await plugin(nino, m, { 
-                        from, 
-                        sender, 
-                        senderNumber, 
-                        args, 
-                        text, 
-                        isOwner, 
-                        isGroup, 
+
+                if (Array.isArray(plugin.command) && plugin.command.includes(command)) {
+                    await plugin(nino, m, {
+                        from,
+                        sender,
+                        senderNumber,
+                        args,
+                        text,
+                        isOwner,
+                        isGroup,
                         pushname,
                         command
                     });
@@ -94,7 +107,11 @@ module.exports = async (nino, chatUpdate) => {
         }
     } catch (err) {
         console.error('CRITICAL_HANDLER_ERROR:', err);
-        const from = chatUpdate.messages[0]?.key?.remoteJid;
-        if (from) await nino.sendMessage(from, { text: global.mess.error });
+        const from = chatUpdate?.messages?.[0]?.key?.remoteJid;
+        if (from) {
+            await nino.sendMessage(from, {
+                text: global.mess?.error || '❌ Ocurrió un error en el handler.'
+            });
+        }
     }
 };
