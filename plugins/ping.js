@@ -1,5 +1,4 @@
 const os = require('os');
-const { speed } = require('perf_hooks');
 
 let handler = async (nino, m, { senderNumber }) => {
     const start = Date.now();
