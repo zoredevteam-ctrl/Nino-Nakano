@@ -15,10 +15,9 @@ import {
   jidDecode,
   DisconnectReason
 } from '@whiskeysockets/baileys'
-import { exec } from 'child_process'
 import { smsg } from './lib/simple.js'
 import { database } from './lib/database.js'
-import { handler } from './handler.js' // Quitamos loadEvents de aquí para evitar el crash
+import { handler } from './handler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pluginsDir = path.join(__dirname, 'plugins')
@@ -32,24 +31,20 @@ const log = {
   error: msg => console.log(chalk.bgRed.white.bold(' ERROR '), chalk.redBright(msg))
 }
 
-const n1 = chalk.hex('#DDA0DD'), n2 = chalk.hex('#FF69B4'), n3 = chalk.hex('#DA70D6'), n4 = chalk.hex('#8B008B')
+const n2 = chalk.hex('#FF69B4'), n3 = chalk.hex('#DA70D6')
 
+// --- BANNER GIGANTE NINO NAKANO ---
 const ninoBanner = `
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
-${n1('             .⢀⡤⠤⠒⠒⢲⡖⠢⢤⣀.             ')}
-${n1('          ⢀⡠⠚⣁⠤⠤⠤⠤⢼⣷⠀⢀⡈⠓⢤.          ')}
-${n1('    ⢷⣤⣪⢖⡥⠒⠊⠉⢉⠉⠺⣿⣇⡀⠱⡀⠀⠱⡄.       ')}
-${n2('    ⢸⣿⡿⠋⠀⠀⠀⠀⠀⣧⢠⢠⠀⢣⠀⠹⡀⡀⠘⣆.      ')}
-${n2('    ⡯⡿⠁⡄⠀⠀⢰⣄⠀⢹⡆⢎⣆⠀⢣⠀⢱⢹⣆⠘⡄.     ')}
-${n2('   ⢸⠀⡗⡄⢡⠸⡀⠀⡞⡄⠘⣿⡸⣯⠳⡵⣄⠀⢇⡏⢆⠹⡄.    ')}
-${n2('   ⢸⡀⢱⢇⠘⣆⢳⡀⢹⣇⠀⢻⡑⣸⣤⣬⣿⡀⢸⢸⡌⢦⠱⡀.   ')}
-${n3('   ⠘⣧⠸⡜⣦⠹⡆⢳⣄⣿⡄⢺⢿⣽⣾⡈⠀⣧⠈⣾⣼⠄⢣⠹⡄.  ')}
-${n3('    ⢿⠀⢣⠙⣧⣿⣾⡏⠉⠀⠀⠀⠙⠉⠀⠀⢸⠀⢹⣿⡄⠀⠳⡹⣦⡀. ')}
-${n3('    ⠘⡇⠀⣿⣍⠙⠿⠁⠠⣄⠀⠀⠀⠀⠀⠀⢸⠀⢸⡏⢻⡄⠀⠘⢾⣗⢦.')}
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
-${n2('      🦋  ')}${chalk.whiteBright.bold('N I N O  N A K A N O')}${n2('  🦋')}
-${chalk.gray('         ꕦ power by Arom ꕦ')}
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+${n2('  ███╗   ██╗██╗███╗   ██╗ ██████╗     ███╗   ██╗ █████╗ ██╗  ██╗ █████╗ ███╗   ██╗ ██████╗  ')}
+${n2('  ████╗  ██║██║████╗  ██║██╔═══██╗    ████╗  ██║██╔══██╗██║ ██╔╝██╔══██╗████╗  ██║██╔═══██╗ ')}
+${n2('  ██╔██╗ ██║██║██╔██╗ ██║██║   ██║    ██╔██╗ ██║███████║█████╔╝ ███████║██╔██╗ ██║██║   ██║ ')}
+${n2('  ██║╚██╗██║██║██║╚██╗██║██║   ██║    ██║╚██╗██║██╔══██║██╔═██╗ ██╔══██║██║╚██╗██║██║   ██║ ')}
+${n2('  ██║ ╚████║██║██║ ╚████║╚██████╔╝    ██║ ╚████║██║  ██║██║  ██╗██║  ██║██║ ╚████║╚██████╔╝ ')}
+${n2('  ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝     ╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ')}
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+${chalk.white.bold('                 POWER BY 𝓐𝓪𝓻𝓸𝓶 | Z0RT SYSTEMS')}
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
 `
 
 // --- CARGA DE PLUGINS ---
@@ -82,20 +77,24 @@ async function startBot () {
   const { state, saveCreds } = await useMultiFileAuthState(global.sessionName)
   const { version } = await fetchLatestBaileysVersion()
 
-  // Selección de método si no hay sesión
+  // --- SELECCIÓN DE MÉTODO (LIMPIO Y SEPARADO) ---
   if (!methodCodeQR && !methodCode && !state.creds.registered && !opcion) {
     console.clear()
     console.log(ninoBanner)
-    opcion = readlineSync.question(chalk.bold.white('\nSelecciona método:\n') + chalk.magenta('1. QR | 2. Código\n--> '))
+    console.log(chalk.bold.cyan('\n🦋 SELECCIONA TU MÉTODO DE VINCULACIÓN:'))
+    console.log(chalk.magenta('   [1]') + chalk.white(' Código QR'))
+    console.log(chalk.magenta('   [2]') + chalk.white(' Código de 8 dígitos'))
+    opcion = readlineSync.question(chalk.bold.yellow('\n--> Elije una opción (1 o 2): ')).trim()
+
     if (opcion === '2') {
-      phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
+      phoneNumber = readlineSync.question(chalk.magenta('\n🦋 Ingresa tu número (ej: 57310...): ')).replace(/\D/g, '')
     }
   }
 
   const conn = makeWASocket({
     version,
     logger: pino({ level: 'silent' }),
-    printQRInTerminal: false,
+    printQRInTerminal: false, // Lo manejamos manualmente con qrcode-terminal
     browser: Browsers.ubuntu('Chrome'),
     auth: {
       creds: state.creds,
@@ -115,26 +114,30 @@ async function startBot () {
 
   conn.ev.on('creds.update', saveCreds)
 
-  // Vinculación por código
+  // Vinculación por código (Opción 2)
   if ((opcion === '2' || methodCode) && !state.creds.registered) {
-    if (!phoneNumber) phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
     setTimeout(async () => {
       let code = await conn.requestPairingCode(phoneNumber)
-      console.log(chalk.magenta(`\n🦋 CÓDIGO: `) + chalk.white.bold(code?.match(/.{1,4}/g)?.join('-') || code) + '\n')
+      console.log(chalk.bgMagenta.white.bold(`\n 🦋 TÚ CÓDIGO: `) + chalk.bgBlack.white.bold(` ${code?.match(/.{1,4}/g)?.join('-') || code} `) + '\n')
     }, 3000)
   }
 
   // --- EVENTO DE CONEXIÓN ---
   conn.ev.on('connection.update', async update => {
     const { qr, connection, lastDisconnect } = update
-    if (qr && (opcion === '1' || methodCodeQR)) qrcode.generate(qr, { small: true })
     
+    // Generar QR en consola si eligió la Opción 1
+    if (qr && (opcion === '1' || methodCodeQR)) {
+        console.log(chalk.cyan('\nEscanea este código QR con tu WhatsApp:'))
+        qrcode.generate(qr, { small: true })
+    }
+
     if (connection === 'open') {
       console.clear()
       console.log(ninoBanner)
       log.success(`Online: ${conn.user?.name || 'Nino Bot'}`)
     }
-    
+
     if (connection === 'close') {
       const reason = new Error(lastDisconnect?.error)?.message
       if (reason !== DisconnectReason.loggedOut) startBot()
