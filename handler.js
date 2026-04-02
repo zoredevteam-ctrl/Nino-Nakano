@@ -1,100 +1,81 @@
-const { printLog } = require('./lib/print');
-const { decodeJid } = require('./lib/simple');
-const db = require('./lib/database');
 const fs = require('fs');
 const path = require('path');
+const chalk = require('chalk');
 require('./settings');
-
-const plugins = {};
-const pluginsFolder = path.join(__dirname, 'plugins');
-
-const loadPlugins = () => {
-    const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'));
-    for (const file of pluginFiles) {
-        const pluginPath = path.join(pluginsFolder, file);
-        delete require.cache[require.resolve(pluginPath)];
-        plugins[file] = require(pluginPath);
-    }
-};
-
-loadPlugins();
 
 module.exports = async (nino, chatUpdate) => {
     try {
         const m = chatUpdate.messages[0];
         if (!m || !m.message) return;
         if (m.key && m.key.remoteJid === 'status@broadcast') return;
-
+        
         const from = m.key.remoteJid;
         const type = Object.keys(m.message)[0];
-        const content = type === 'conversation' ? m.message.conversation
-                      : type === 'extendedTextMessage' ? m.message.extendedTextMessage.text
-                      : type === 'imageMessage' ? m.message.imageMessage.caption
-                      : type === 'videoMessage' ? m.message.videoMessage.caption : '';
-
-        const sender = decodeJid(m.key.participant || m.key.remoteJid);
+        const sender = m.key.participant || m.key.remoteJid;
         const senderNumber = sender.split('@')[0];
-        const isGroup = from.endsWith('@g.us');
-        const pushname = m.pushName || 'Usuario';
 
-        const isCmd = content.startsWith(global.prefix);
-        const command = isCmd ? content.slice(global.prefix.length).trim().split(' ').shift().toLowerCase() : '';
-        const args = content.trim().split(/ +/).slice(1);
-        const text = args.join(' ');
+        // --- SISTEMA DE COMANDOS ---
+        const body = (type === 'conversation') ? m.message.conversation : 
+                     (type === 'extendedTextMessage') ? m.message.extendedTextMessage.text : 
+                     (type === 'imageMessage') ? m.message.imageMessage.caption : 
+                     (type === 'videoMessage') ? m.message.videoMessage.caption : '';
         
-        const isOwner = global.ownerNumber.includes(senderNumber);
+        const prefix = global.prefix || '#';
+        const isCmd = body.startsWith(prefix);
+        const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
+        const args = body.trim().split(/ +/).slice(1);
+        const text = args.join(' ');
 
-        printLog(isCmd, senderNumber, isGroup ? 'Grupo' : null, content);
+        // --- 🛡️ EL ESCUDO ANTI-ERRORES (Lee global.owners) 🛡️ ---
+        const isOwner = (Array.isArray(global.owners) ? global.owners : []).includes(senderNumber);
+        
+        // --- METADATOS DE GRUPO ---
+        const isGroup = from.endsWith('@g.us');
+        const groupMetadata = isGroup ? await nino.groupMetadata(from).catch(() => ({})) : {};
+        const participants = isGroup ? (groupMetadata.participants || []) : [];
+        const userAdmin = isGroup ? !!participants.find(p => p.id === sender)?.admin : false;
+        const botAdmin = isGroup ? !!participants.find(p => p.id === (nino.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false;
 
-        if (!db.data.users[sender]) {
-            db.data.users[sender] = {
-                name: pushname,
-                xp: 0,
-                level: 1,
-                premium: false,
-                limit: 20,
-                warn: 0,
-                lastChat: Date.now()
-            };
-            db.save();
-        } else {
-            db.data.users[sender].xp += Math.floor(Math.random() * 10);
-            db.data.users[sender].lastChat = Date.now();
-            
-            let user = db.data.users[sender];
-            let requiredXp = user.level * 100;
-            if (user.xp >= requiredXp) {
-                user.level += 1;
-                user.xp = 0;
-                await nino.sendMessage(from, { text: `🦋 ¡Vaya, tonto! Subiste al nivel *${user.level}*. Sigue así...` }, { quoted: m });
-            }
-            db.save();
+        // --- LOG DE CONSOLA ---
+        if (isCmd) {
+            console.log(chalk.hex('#FF69B4').bold('---------- [ NUEVO COMANDO ] ----------'));
+            console.log(chalk.white(`🦋 Usuario: ${senderNumber} ${isOwner ? '(OWNER)' : ''}`));
+            console.log(chalk.white(`🦋 Comando: ${prefix}${command}`));
+            console.log(chalk.white(`🦋 Canal: ${isGroup ? groupMetadata.subject : 'Chat Privado'}`));
+            console.log(chalk.hex('#FF69B4').bold('---------------------------------------'));
         }
 
-        if (isCmd) {
-            let executed = false;
-            for (const name in plugins) {
-                const plugin = plugins[name];
-                if (plugin.command && plugin.command.includes(command)) {
-                    await plugin(nino, m, { 
-                        from, 
-                        sender, 
-                        senderNumber, 
-                        args, 
-                        text, 
-                        isOwner, 
-                        isGroup, 
-                        pushname,
-                        command
-                    });
-                    executed = true;
-                    break;
+        // --- EJECUTOR DE PLUGINS ---
+        const pluginPath = path.join(__dirname, 'plugins');
+        if (!fs.existsSync(pluginPath)) fs.mkdirSync(pluginPath);
+        
+        const files = fs.readdirSync(pluginPath);
+        for (let file of files) {
+            if (file.endsWith('.js')) {
+                try {
+                    const plugin = require(path.join(pluginPath, file));
+                    if (plugin.command && (Array.isArray(plugin.command) ? plugin.command.includes(command) : plugin.command === command)) {
+                        await plugin(nino, m, {
+                            from, isGroup, isOwner, userAdmin, botAdmin, args, text, sender,
+                            pushname: m.pushName || 'Usuario'
+                        });
+                    }
+                } catch (pluginErr) {
+                    // Solo avisa del plugin dañado, pero no crashea el bot
+                    console.error(chalk.yellow(`Aviso en plugin ${file}:`), pluginErr.message);
                 }
             }
         }
+
     } catch (err) {
-        console.error('CRITICAL_HANDLER_ERROR:', err);
-        const from = chatUpdate.messages[0]?.key?.remoteJid;
-        if (from) await nino.sendMessage(from, { text: global.mess.error });
+        console.log(chalk.red.bold('ERROR_EN_HANDLER:'), err.message);
     }
 };
+
+let file = require.resolve(__filename);
+fs.watchFile(file, () => {
+    fs.unwatchFile(file);
+    console.log(chalk.hex('#FF69B4').bold('¡Handler actualizado correctamente! 🦋✨'));
+    delete require.cache[file];
+    require(file);
+});
