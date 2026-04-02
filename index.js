@@ -18,11 +18,10 @@ import {
 import { exec } from 'child_process'
 import { smsg } from './lib/simple.js'
 import { database } from './lib/database.js'
-import { handler, loadEvents } from './handler.js'
+import { handler } from './handler.js' // Quitamos loadEvents de aquí para evitar el crash
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pluginsDir = path.join(__dirname, 'plugins')
-const SUBBOTS_DIR = './Sessions/SubBots'
 global.conns = []
 
 // Logs con estilo Nino
@@ -49,7 +48,7 @@ ${n3('    ⢿⠀⢣⠙⣧⣿⣾⡏⠉⠀⠀⠀⠙⠉⠀⠀⢸⠀⢹⣿⡄⠀⠳�
 ${n3('    ⠘⡇⠀⣿⣍⠙⠿⠁⠠⣄⠀⠀⠀⠀⠀⠀⢸⠀⢸⡏⢻⡄⠀⠘⢾⣗⢦.')}
 ${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
 ${n2('      🦋  ')}${chalk.whiteBright.bold('N I N O  N A K A N O')}${n2('  🦋')}
-${chalk.gray('         ꕦ power by Arom ꕦ')}  ${chalk.gray('v' + global.botVersion)}
+${chalk.gray('         ꕦ power by Arom ꕦ')}
 ${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
 `
 
@@ -60,15 +59,18 @@ async function loadPlugins () {
   const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js'))
   for (const file of files) {
     try {
-      const filePath = path.join(pluginsDir, file)
-      const plugin = (await import(`${filePath}?t=${Date.now()}`)).default
-      if (plugin) { plugins.set(file, plugin); log.success(`Cargado: ${file}`) }
+      const filePath = path.resolve(pluginsDir, file)
+      const plugin = (await import(`file://${filePath}?t=${Date.now()}`)).default
+      if (plugin) { 
+        plugins.set(file, plugin)
+        log.success(`Cargado: ${file}`) 
+      }
     } catch (e) { log.error(`Error en ${file}: ${e.message}`) }
   }
 }
 
-global.sessionName = global.sessionName || './Sessions/Owner'
-try { fs.mkdirSync(global.sessionName, { recursive: true }) } catch (e) {}
+global.sessionName = './Sessions/Owner'
+if (!fs.existsSync(global.sessionName)) fs.mkdirSync(global.sessionName, { recursive: true })
 
 const methodCodeQR = process.argv.includes('--qr')
 const methodCode = process.argv.includes('--code')
@@ -76,18 +78,19 @@ const methodCode = process.argv.includes('--code')
 let opcion = ''
 let phoneNumber = ''
 
-if (methodCodeQR) opcion = '1'
-else if (methodCode) opcion = '2'
-else if (!fs.existsSync(`${global.sessionName}/creds.json`)) {
-  opcion = readlineSync.question(chalk.bold.white('\nSelecciona método:\n') + chalk.magenta('1. QR | 2. Código\n--> '))
-  if (opcion === '2') {
-    phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
-  }
-}
-
 async function startBot () {
   const { state, saveCreds } = await useMultiFileAuthState(global.sessionName)
   const { version } = await fetchLatestBaileysVersion()
+
+  // Selección de método si no hay sesión
+  if (!methodCodeQR && !methodCode && !state.creds.registered && !opcion) {
+    console.clear()
+    console.log(ninoBanner)
+    opcion = readlineSync.question(chalk.bold.white('\nSelecciona método:\n') + chalk.magenta('1. QR | 2. Código\n--> '))
+    if (opcion === '2') {
+      phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
+    }
+  }
 
   const conn = makeWASocket({
     version,
@@ -113,7 +116,8 @@ async function startBot () {
   conn.ev.on('creds.update', saveCreds)
 
   // Vinculación por código
-  if (opcion === '2' && !state.creds.registered) {
+  if ((opcion === '2' || methodCode) && !state.creds.registered) {
+    if (!phoneNumber) phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
     setTimeout(async () => {
       let code = await conn.requestPairingCode(phoneNumber)
       console.log(chalk.magenta(`\n🦋 CÓDIGO: `) + chalk.white.bold(code?.match(/.{1,4}/g)?.join('-') || code) + '\n')
@@ -123,62 +127,41 @@ async function startBot () {
   // --- EVENTO DE CONEXIÓN ---
   conn.ev.on('connection.update', async update => {
     const { qr, connection, lastDisconnect } = update
-    if (qr && opcion === '1') qrcode.generate(qr, { small: true })
+    if (qr && (opcion === '1' || methodCodeQR)) qrcode.generate(qr, { small: true })
+    
     if (connection === 'open') {
+      console.clear()
       console.log(ninoBanner)
-      log.success(`Online: ${conn.user?.name}`)
-      await loadEvents(conn)
+      log.success(`Online: ${conn.user?.name || 'Nino Bot'}`)
     }
-    if (connection === 'close') startBot()
+    
+    if (connection === 'close') {
+      const reason = new Error(lastDisconnect?.error)?.message
+      if (reason !== DisconnectReason.loggedOut) startBot()
+      else log.error('Sesión cerrada. Borra la carpeta Sessions para re-vincular.')
+    }
   })
 
-  // --- 🦋 SISTEMA DE BIENVENIDA Y DESPEDIDA (ESTILO NINO) 🦋 ---
+  // --- BIENVENIDA / DESPEDIDA ---
   conn.ev.on('group-participants.update', async (anu) => {
     try {
       const metadata = await conn.groupMetadata(anu.id)
-      const participants = anu.participants
-      for (let num of participants) {
+      for (let num of anu.participants) {
         let ppuser;
         try { ppuser = await conn.profilePictureUrl(num, 'image') } catch { ppuser = global.banner }
 
         if (anu.action === 'add') {
           let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`
-          await conn.sendMessage(anu.id, {
-            text: txt,
-            contextInfo: {
-              mentionedJid: [num],
-              externalAdReply: {
-                title: `NUEVO INTEGRANTE 🦋`,
-                body: `Bienvenido a ${metadata.subject}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: global.rcanal,
-                mediaType: 1,
-                renderLargerThumbnail: true
-              }
-            }
-          })
+          await conn.sendMessage(anu.id, { text: txt, contextInfo: { mentionedJid: [num], externalAdReply: { title: `NUEVO INTEGRANTE 🦋`, body: `Bienvenido a ${metadata.subject}`, thumbnailUrl: ppuser, sourceUrl: global.rcanal, mediaType: 1, renderLargerThumbnail: true }}})
         } else if (anu.action === 'remove') {
-          let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos de la cual preocuparse. ¡Ni regreses! 💅💢`
-          await conn.sendMessage(anu.id, {
-            text: txt,
-            contextInfo: {
-              mentionedJid: [num],
-              externalAdReply: {
-                title: `USUARIO SALIENTE 🦋`,
-                body: `Se fue de ${metadata.subject}`,
-                thumbnailUrl: ppuser,
-                sourceUrl: global.rcanal,
-                mediaType: 1,
-                renderLargerThumbnail: true
-              }
-            }
-          })
+          let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos. ¡Ni regreses! 💅💢`
+          await conn.sendMessage(anu.id, { text: txt, contextInfo: { mentionedJid: [num], externalAdReply: { title: `USUARIO SALIENTE 🦋`, body: `Se fue de ${metadata.subject}`, thumbnailUrl: ppuser, sourceUrl: global.rcanal, mediaType: 1, renderLargerThumbnail: true }}})
         }
       }
-    } catch (err) { log.error('Error en Welcome System: ' + err.message) }
+    } catch (err) { console.log(err) }
   })
 
-  // --- PROCESAMIENTO DE MENSAJES ---
+  // --- PROCESAMIENTO ---
   conn.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     let m = messages[0]
@@ -186,10 +169,11 @@ async function startBot () {
     try {
       m = await smsg(conn, m)
       await handler(m, conn, plugins)
-    } catch (e) { log.error(e.message) }
+    } catch (e) { console.error(e) }
   })
 }
 
+// ARRANQUE
 (async () => {
   await database.read()
   await loadPlugins()
