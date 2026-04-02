@@ -1,11 +1,9 @@
-const Baileys = require('@whiskeysockets/baileys');
-const makeWASocket = Baileys.default;
 const { 
+    default: makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason, 
     fetchLatestBaileysVersion 
-} = Baileys;
-const makeInMemoryStore = Baileys.makeInMemoryStore;
+} = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
 const { Boom } = require('@hapi/boom');
@@ -15,8 +13,6 @@ const readline = require('readline');
 const handler = require('./handler');
 require('./settings');
 
-// Inicialización segura del store
-const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
@@ -62,10 +58,6 @@ async function startNino() {
         console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
     }
 
-    // Vinculamos la memoria (store) a la base de eventos del bot
-    store?.bind(nino.ev);
-
-    // Gestor de conexión
     nino.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
@@ -82,10 +74,8 @@ async function startNino() {
         }
     });
 
-    // Guardado de credenciales
     nino.ev.on('creds.update', saveCreds);
 
-    // Sistema de Bienvenida y Despedida
     nino.ev.on('group-participants.update', async (anu) => {
         try {
             const metadata = await nino.groupMetadata(anu.id);
@@ -95,7 +85,7 @@ async function startNino() {
                 try { 
                     ppuser = await nino.profilePictureUrl(num, 'image'); 
                 } catch { 
-                    ppuser = global.banner; // Fallback al banner si no tiene foto
+                    ppuser = global.banner; 
                 }
 
                 if (anu.action === 'add') {
@@ -137,7 +127,6 @@ async function startNino() {
         }
     });
 
-    // Enrutador de mensajes (Llama a tu handler.js)
     nino.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             await handler(nino, chatUpdate);
