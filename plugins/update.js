@@ -2,12 +2,10 @@ const { exec } = require('child_process');
 require('../settings');
 
 let handler = async (nino, m, { from, isOwner }) => {
-    // Verificación de seguridad: Solo el dueño puede actualizar
     if (!isOwner) return nino.sendMessage(from, { text: global.mess.owner }, { quoted: m });
 
     await nino.sendMessage(from, { text: 'Revisando si hay actualizaciones en el repositorio... 🦋' }, { quoted: m });
 
-    // Ejecutamos el comando de Git
     exec('git pull', async (err, stdout, stderr) => {
         if (err) {
             return nino.sendMessage(from, { 
@@ -23,7 +21,7 @@ let handler = async (nino, m, { from, isOwner }) => {
 
         if (stdout.includes('Updating')) {
             let updateMsg = `✅ *¡ACTUALIZACIÓN EXITOSA!*\n\n*Cambios:* \n${stdout}\n\nReiniciando el sistema para aplicar los cambios... 🦋`;
-            
+
             await nino.sendMessage(from, { 
                 text: updateMsg,
                 contextInfo: {
@@ -38,15 +36,14 @@ let handler = async (nino, m, { from, isOwner }) => {
                 }
             }, { quoted: m });
 
-            // Forzamos el reinicio del proceso para que cargue los nuevos archivos
             process.exit(0); 
         }
 
-        if (stderr) {
-            console.error('Git Stderr:', stderr);
+        // ✅ FIX: Respuesta si git retorna algo inesperado
+        if (stderr || stdout) {
+            return nino.sendMessage(from, {
+                text: `⚠️ *Respuesta de Git:*\n\n${stdout || stderr}`
+            }, { quoted: m });
         }
     });
 };
-
-handler.command = ['update', 'actualizar', 'gitpull'];
-module.exports = handler;
