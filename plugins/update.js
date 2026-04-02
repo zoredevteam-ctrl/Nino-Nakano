@@ -1,49 +1,53 @@
-const { exec } = require('child_process');
-require('../settings');
+import { exec } from 'child_process'
 
-let handler = async (nino, m, { from, isOwner }) => {
-    if (!isOwner) return nino.sendMessage(from, { text: global.mess.owner }, { quoted: m });
+/**
+ * Plugin de actualización automática vía Git
+ */
+let handler = async (conn, m, { text, isOwner }) => {
+    // Nota: El handler ya bloquea si pones 'handler.owner = true' abajo, 
+    // pero dejamos este mensaje por si acaso con la personalidad de Nino.
+    if (!isOwner) return m.reply('🦋 *¡Oye!* ¿Qué crees que haces intentando tocar mis archivos? Solo Aarom puede actualizarme. 💅💢')
 
-    await nino.sendMessage(from, { text: 'Revisando si hay actualizaciones en el repositorio... 🦋' }, { quoted: m });
+    await m.reply('Revisando si hay algo nuevo en el repositorio... No me hagas esperar. 🦋')
 
     exec('git pull', async (err, stdout, stderr) => {
         if (err) {
-            return nino.sendMessage(from, { 
-                text: `❌ *Error al actualizar:* \n\n${err.message}` 
-            }, { quoted: m });
+            return m.reply(`❌ *¡Ugh, un error!* \n\n\`\`\`${err.message}\`\`\``)
         }
 
-        if (stdout.includes('Already up to date.')) {
-            return nino.sendMessage(from, { 
-                text: 'No hay nada nuevo, tonto. El bot ya está actualizado a la última versión. 🙄✨' 
-            }, { quoted: m });
+        if (stdout.includes('Already up to date')) {
+            return m.reply('No hay nada nuevo, tonto. El bot ya está actualizado a la última versión. 🙄✨')
         }
 
-        if (stdout.includes('Updating')) {
-            let updateMsg = `✅ *¡ACTUALIZACIÓN EXITOSA!*\n\n*Cambios:* \n${stdout}\n\nReiniciando el sistema para aplicar los cambios... 🦋`;
+        if (stdout.includes('Updating') || stdout.includes('unpacking')) {
+            let updateMsg = `✅ *¡ACTUALIZACIÓN EXITOSA!*\n\n*Cambios detectados:* \n\`\`\`${stdout}\`\`\`\n\nReiniciando el sistema para aplicar los cambios... No te vayas. 🦋`
 
-            await nino.sendMessage(from, { 
+            await conn.sendMessage(m.chat, { 
                 text: updateMsg,
                 contextInfo: {
                     externalAdReply: {
-                        title: 'SISTEMA ACTUALIZADO',
-                        body: 'Power by 𝓐𝓪𝓻𝓸𝓶',
-                        thumbnailUrl: global.banner,
+                        title: 'NINO - SISTEMA ACTUALIZADO',
+                        body: 'Power by 𝓐𝓪𝓻om | Z0RT SYSTEMS',
+                        thumbnailUrl: global.banner, // Asegúrate de tener global.banner en settings.js
                         sourceUrl: global.rcanal,
                         mediaType: 1,
                         renderLargerThumbnail: true
                     }
                 }
-            }, { quoted: m });
+            }, { quoted: m })
 
-            process.exit(0); 
+            // Esperamos un segundo antes de apagar para que el mensaje se envíe bien
+            setTimeout(() => {
+                process.exit(0)
+            }, 1500)
+        } else {
+            return m.reply(`⚠️ *Respuesta extraña de Git:* \n\n${stdout || stderr}`)
         }
+    })
+}
 
-        // ✅ FIX: Respuesta si git retorna algo inesperado
-        if (stderr || stdout) {
-            return nino.sendMessage(from, {
-                text: `⚠️ *Respuesta de Git:*\n\n${stdout || stderr}`
-            }, { quoted: m });
-        }
-    });
-};
+// --- CONFIGURACIÓN DEL COMANDO ---
+handler.command = ['update', 'actualizar', 'gitpull'] // Comandos que activan el plugin
+handler.owner = true // 🛡️ EL HANDLER BLOQUEA AUTOMÁTICAMENTE A LOS QUE NO SEAN OWNER
+
+export default handler
