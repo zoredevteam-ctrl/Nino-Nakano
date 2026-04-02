@@ -1,34 +1,46 @@
-let handler = async (nino, m, { from, isGroup, isOwner, sender }) => {
-    if (!isGroup) return nino.sendMessage(from, { text: '¡Tonto! Este comando solo sirve en grupos.' }, { quoted: m });
+/**
+ * Plugin para expulsar usuarios de un grupo
+ */
+let handler = async (conn, m, { participants, isBotAdmin, isOwner, userAdmin }) => {
+    // El handler ya verifica esto si activamos las propiedades abajo, 
+    // pero mantenemos los mensajes con la personalidad de Nino:
+    if (!m.isGroup) return m.reply('🦋 ¡Tonto! Este comando solo sirve en grupos. No sé qué intentas hacer aquí. 🙄')
     
-    // Validar si el que lo usa es admin o el dueño
-    const groupMetadata = await nino.groupMetadata(from);
-    const participants = groupMetadata.participants;
-    const isBotAdmin = participants.find(p => p.id === nino.user.id.split(':')[0] + '@s.whatsapp.net')?.admin;
-    const isAdmin = participants.find(p => p.id === sender)?.admin;
-
-    if (!isAdmin && !isOwner) return nino.sendMessage(from, { text: '¿Quién te crees? Solo los admins pueden usar esto.' }, { quoted: m });
-    if (!isBotAdmin) return nino.sendMessage(from, { text: 'Dame admin primero o no podré hacer nada, idiota.' }, { quoted: m });
-
-    let user = m.message.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || m.message.extendedTextMessage?.contextInfo?.participant;
-    if (!user) return nino.sendMessage(from, { text: 'Etiqueta a alguien o responde a su mensaje para echarlo.' }, { quoted: m });
-
-    await nino.groupParticipantsUpdate(from, [user], 'remove');
+    if (!userAdmin && !isOwner) return m.reply('🦋 ¿Quién te crees? Solo los admins pueden darme órdenes de este tipo. 💅')
     
-    await nino.sendMessage(from, { 
-        text: `🦋 Usuario eliminado. No molestes más.`,
+    if (!isBotAdmin) return m.reply('🦋 ¡Dame admin primero! No puedo echar a nadie si no tengo poder en el grupo, idiota. ✨')
+
+    // Obtener el usuario a expulsar (por mención o por respuesta a mensaje)
+    let user = m.mentionedJid[0] ? m.mentionedJid[0] : m.quoted ? m.quoted.sender : false
+    
+    if (!user) return m.reply('🦋 Etiqueta a alguien o responde a su mensaje para que pueda echarlo de una vez. 💢')
+
+    // Evitar que el bot se intente echar a sí mismo o al dueño
+    if (user === conn.user.jid) return m.reply('🦋 ¿Intentas echarme a mí? Qué gracioso... pero no va a pasar. 🙄')
+
+    // Ejecutar la expulsión
+    await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
+
+    // Mensaje de confirmación con estilo
+    await conn.sendMessage(m.chat, { 
+        text: `🦋 Usuario eliminado. Espero que no vuelva a molestar, ugh.`,
         contextInfo: {
             externalAdReply: {
-                title: global.botName,
-                body: 'Sigue mi canal oficial',
+                title: 'NINO - MODERACIÓN 🦋',
+                body: 'Usuario expulsado con éxito',
                 thumbnailUrl: global.banner,
                 sourceUrl: global.rcanal,
                 mediaType: 1,
                 renderLargerThumbnail: true
             }
         }
-    }, { quoted: m });
-};
+    }, { quoted: m })
+}
 
-handler.command = ['kick', 'echar'];
-module.exports = handler;
+// --- CONFIGURACIÓN ---
+handler.command = ['kick', 'echar', 'sacar', 'ban'] // Comandos
+handler.group = true       // Solo funciona en grupos
+handler.admin = true       // Solo admins pueden usarlo
+handler.botAdmin = true    // El bot necesita ser admin
+
+export default handler
