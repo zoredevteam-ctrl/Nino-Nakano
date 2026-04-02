@@ -3,7 +3,7 @@ const {
     useMultiFileAuthState, 
     DisconnectReason, 
     fetchLatestBaileysVersion,
-    Browsers // <-- Importación necesaria para arreglar el código de vinculación
+    Browsers 
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
@@ -18,11 +18,11 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
 async function startNino() {
+    // 1. GESTIÓN DE ESTADO Y VERSIÓN
     const { state, saveCreds } = await useMultiFileAuthState('./session_nino');
     const { version, isLatest } = await fetchLatestBaileysVersion();
 
     console.clear();
-    // ASCII Art con espaciado uniforme
     console.log(chalk.hex('#FF69B4').bold(`
     ███╗   ██╗██╗███╗   ██╗ ██████╗ 
     ████╗  ██║██║████╗  ██║██╔═══██╗
@@ -39,6 +39,7 @@ async function startNino() {
     console.log(chalk.white.bold('                 power by 𝓐𝓪𝓻𝓸𝓶\n'));
     console.log(chalk.gray(`Motor: Baileys v${version.join('.')} ${isLatest ? '(Actualizado)' : ''}\n`));
 
+    // 2. SELECCIÓN DE MÉTODO (QR O CÓDIGO)
     let method = 0;
     if (!state.creds.registered) {
         console.log(chalk.cyan('Selecciona el método de vinculación:'));
@@ -47,38 +48,38 @@ async function startNino() {
         method = await question(chalk.magenta('\nOpcion > '));
     }
 
+    // 3. CONFIGURACIÓN DEL SOCKET
     const nino = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
         printQRInTerminal: method === '2',
         auth: state,
-        // Usamos una configuración estándar para evitar el bloqueo de WhatsApp
-        browser: Browsers.ubuntu('Chrome'), 
+        browser: Browsers.ubuntu('Chrome'), // Evita detecciones de bots genéricos
         generateHighQualityLinkPreview: true,
+        markOnlineOnConnect: true,
+        syncFullHistory: false, // Optimiza el arranque
         getMessage: async (key) => {
-            return { conversation: 'Nino Nakano está procesando este mensaje...' };
+            return { conversation: 'Nino Nakano está procesando...' };
         }
     });
 
+    // 4. LÓGICA DE PAIRING CODE (OPCIÓN 1)
     if (method === '1' && !nino.authState.creds.registered) {
         const phoneNumber = await question(chalk.cyan('\nIngresa tu número de WhatsApp (ej: 573123456789):\n> '));
-        
-        // Un pequeño retraso asegura que el socket esté listo para solicitar el código
+        const numeroLimpio = phoneNumber.trim().replace(/[^0-9]/g, '');
+
         setTimeout(async () => {
             try {
-                // Limpiamos cualquier espacio o carácter raro del número
-                let numeroLimpio = phoneNumber.trim().replace(/[^0-9]/g, '');
                 let code = await nino.requestPairingCode(numeroLimpio);
-                
-                // Formateamos el código para que sea más legible (ej: 1234-5678)
-                let formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
-                console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(formattedCode) + '\n');
+                code = code?.match(/.{1,4}/g)?.join('-') || code;
+                console.log(chalk.white('\nTu código es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
             } catch (err) {
-                console.log(chalk.red('\nError al solicitar el código. Asegúrate de que el número sea correcto y no esté baneado: '), err.message);
+                console.log(chalk.red('\nError al generar código: '), err.message);
             }
-        }, 2000); // 2 segundos de espera
+        }, 3000); 
     }
 
+    // 5. GESTIÓN DE CONEXIÓN Y AUTO-LIMPIEZA
     nino.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
 
@@ -86,44 +87,23 @@ async function startNino() {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
 
             if (reason === DisconnectReason.loggedOut || reason === DisconnectReason.badSession) { 
-                console.log(chalk.red.bold(`\n❌ Sesión cerrada o corrupta detectada.`)); 
-                try {
-                    fs.rmSync('./session_nino', { recursive: true, force: true });
-                    console.log(chalk.yellow('🗑️ Carpeta session_nino eliminada automáticamente.'));
-                } catch (e) {
-                    console.log(chalk.red('⚠️ No se pudo borrar la carpeta automáticamente.'));
-                }
-                console.log(chalk.cyan('🔄 Ejecuta "npm start" de nuevo para generar una nueva sesión.'));
+                console.log(chalk.red.bold(`\n❌ Sesión inválida. Eliminando datos...`)); 
+                fs.rmSync('./session_nino', { recursive: true, force: true });
                 process.exit(0);
             } 
-            else if (reason === DisconnectReason.connectionClosed) { 
-                console.log(chalk.yellow("Conexión cerrada, reconectando..."));
-                setTimeout(() => startNino(), 3000);
-            }
-            else if (reason === DisconnectReason.connectionLost) { 
-                console.log(chalk.yellow("Conexión perdida, reconectando..."));
-                setTimeout(() => startNino(), 3000);
-            }
-            else if (reason === DisconnectReason.connectionReplaced) { 
-                console.log(chalk.red("Sesión reemplazada. Cierra la otra conexión.")); 
-                process.exit(0); 
-            }
-            else if (reason === DisconnectReason.restartRequired) { 
-                console.log(chalk.cyan("Reinicio requerido por el servidor..."));
-                setTimeout(() => startNino(), 3000);
-            }
-            else { 
-                console.log(chalk.white(`Desconexión desconocida: ${reason}`));
+            else {
+                console.log(chalk.yellow(`\n🔄 Reconectando en 5 segundos... (Razón: ${reason})`));
                 setTimeout(() => startNino(), 5000);
             }
 
         } else if (connection === 'open') {
-            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista para operar! 🦋\n'));
+            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea! 🦋\n'));
         }
     });
 
     nino.ev.on('creds.update', saveCreds);
 
+    // 6. SISTEMA DE BIENVENIDA / DESPEDIDA
     nino.ev.on('group-participants.update', async (anu) => {
         try {
             const metadata = await nino.groupMetadata(anu.id);
@@ -133,52 +113,41 @@ async function startNino() {
                 try { ppuser = await nino.profilePictureUrl(num, 'image'); } 
                 catch { ppuser = global.banner; }
 
+                const context = {
+                    mentionedJid: [num],
+                    externalAdReply: {
+                        title: anu.action === 'add' ? 'NUEVO INTEGRANTE 🦋' : 'USUARIO SALIENTE 🦋',
+                        body: metadata.subject,
+                        thumbnailUrl: ppuser,
+                        sourceUrl: global.rcanal,
+                        mediaType: 1,
+                        renderLargerThumbnail: true
+                    }
+                };
+
                 if (anu.action === 'add') {
-                    let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`;
-                    await nino.sendMessage(anu.id, {
-                        text: txt,
-                        contextInfo: {
-                            mentionedJid: [num],
-                            externalAdReply: {
-                                title: `NUEVO INTEGRANTE 🦋`,
-                                body: `Bienvenido a ${metadata.subject}`,
-                                thumbnailUrl: ppuser,
-                                sourceUrl: global.rcanal,
-                                mediaType: 1,
-                                renderLargerThumbnail: true
-                            }
-                        }
-                    });
+                    let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que estés aquí, pero intenta no molestar en *${metadata.subject}*. 🦋🙄`;
+                    await nino.sendMessage(anu.id, { text: txt, contextInfo: context });
                 } else if (anu.action === 'remove') {
-                    let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos de la cual preocuparse. ¡Ni regreses! 💅💢`;
-                    await nino.sendMessage(anu.id, {
-                        text: txt,
-                        contextInfo: {
-                            mentionedJid: [num],
-                            externalAdReply: {
-                                title: `USUARIO SALIENTE 🦋`,
-                                body: `Se fue de ${metadata.subject}`,
-                                thumbnailUrl: ppuser,
-                                sourceUrl: global.rcanal,
-                                mediaType: 1,
-                                renderLargerThumbnail: true
-                            }
-                        }
-                    });
+                    let txt = `@${num.split('@')[0]} se fue. Ugh, una molestia menos. ¡Ni regreses! 💅💢`;
+                    await nino.sendMessage(anu.id, { text: txt, contextInfo: context });
                 }
             }
         } catch (err) { 
-            console.log('Error en Welcome System:', err.message); 
+            console.log('Error en Evento de Grupo:', err.message); 
         }
     });
 
+    // 7. ENTRADA AL HANDLER
     nino.ev.on('messages.upsert', async (chatUpdate) => {
         try {
+            if (!chatUpdate.messages[0]) return;
             await handler(nino, chatUpdate);
         } catch (err) {
-            console.error(chalk.red('Error crítico enviando al Handler:'), err.message);
+            console.error(chalk.red('Error en Handler:'), err.message);
         }
     });
 }
 
-startNino();
+// Arrancar el bot
+startNino().catch(err => console.error("Error fatal:", err));
