@@ -1,21 +1,21 @@
+const Baileys = require('@whiskeysockets/baileys');
+const makeWASocket = Baileys.default;
 const { 
-    default: makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason, 
-    fetchLatestBaileysVersion, 
-    makeInMemoryStore, 
-    jidDecode,
-    proto
-} = require('@whiskeysockets/baileys');
+    fetchLatestBaileysVersion 
+} = Baileys;
+const makeInMemoryStore = Baileys.makeInMemoryStore;
+
 const pino = require('pino');
 const { Boom } = require('@hapi/boom');
 const fs = require('fs');
 const chalk = require('chalk');
 const readline = require('readline');
-const qrcode = require('qrcode-terminal');
 const handler = require('./handler');
 require('./settings');
 
+// Inicialización segura del store
 const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) });
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
@@ -51,46 +51,54 @@ async function startNino() {
     const nino = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: method == '2',
+        printQRInTerminal: method === '2',
         auth: state,
         browser: ["Ubuntu", "Chrome", "20.0.04"]
     });
 
-    if (method == '1' && !nino.authState.creds.registered) {
+    if (method === '1' && !nino.authState.creds.registered) {
         const phoneNumber = await question(chalk.cyan('\nIngresa tu número de WhatsApp (ej: 573123456789):\n> '));
         const code = await nino.requestPairingCode(phoneNumber.trim());
         console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
     }
 
-    store.bind(nino.ev);
+    // Vinculamos la memoria (store) a la base de eventos del bot
+    store?.bind(nino.ev);
 
+    // Gestor de conexión
     nino.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
-            if (reason === DisconnectReason.badSession) { console.log(chalk.red(`Sesión corrupta, por favor elimina la carpeta session_nino y escanea de nuevo.`)); startNino(); }
+            if (reason === DisconnectReason.badSession) { console.log(chalk.red(`Sesión corrupta, elimina la carpeta session_nino y escanea de nuevo.`)); startNino(); }
             else if (reason === DisconnectReason.connectionClosed) { console.log(chalk.yellow("Conexión cerrada, reconectando...")); startNino(); }
-            else if (reason === DisconnectReason.connectionLost) { console.log(chalk.yellow("Conexión perdida con el servidor, reconectando...")); startNino(); }
-            else if (reason === DisconnectReason.connectionReplaced) { console.log(chalk.red("Sesión reemplazada, por favor cierra la sesión actual primero.")); nino.logout(); }
-            else if (reason === DisconnectReason.loggedOut) { console.log(chalk.red(`Dispositivo vinculado, elimina la carpeta session_nino y escanea de nuevo.`)); nino.logout(); }
-            else if (reason === DisconnectReason.restartRequired) { console.log(chalk.cyan("Reinicio requerido, reiniciando...")); startNino(); }
-            else { console.log(chalk.white(`Motivo de desconexión desconocido: ${reason}|${connection}`)); startNino(); }
+            else if (reason === DisconnectReason.connectionLost) { console.log(chalk.yellow("Conexión perdida, reconectando...")); startNino(); }
+            else if (reason === DisconnectReason.connectionReplaced) { console.log(chalk.red("Sesión reemplazada, cierra la otra sesión primero.")); nino.logout(); }
+            else if (reason === DisconnectReason.loggedOut) { console.log(chalk.red(`Sesión cerrada, elimina session_nino y escanea de nuevo.`)); nino.logout(); }
+            else if (reason === DisconnectReason.restartRequired) { console.log(chalk.cyan("Reinicio requerido...")); startNino(); }
+            else { console.log(chalk.white(`Desconexión desconocida: ${reason}`)); startNino(); }
         } else if (connection === 'open') {
-            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista! 🦋\n'));
+            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista para operar! 🦋\n'));
         }
     });
 
+    // Guardado de credenciales
     nino.ev.on('creds.update', saveCreds);
 
+    // Sistema de Bienvenida y Despedida
     nino.ev.on('group-participants.update', async (anu) => {
         try {
             const metadata = await nino.groupMetadata(anu.id);
             const participants = anu.participants;
             for (let num of participants) {
                 let ppuser;
-                try { ppuser = await nino.profilePictureUrl(num, 'image'); } catch { ppuser = global.banner; }
+                try { 
+                    ppuser = await nino.profilePictureUrl(num, 'image'); 
+                } catch { 
+                    ppuser = global.banner; // Fallback al banner si no tiene foto
+                }
 
-                if (anu.action == 'add') {
+                if (anu.action === 'add') {
                     let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`;
                     await nino.sendMessage(anu.id, {
                         text: txt,
@@ -106,7 +114,7 @@ async function startNino() {
                             }
                         }
                     });
-                } else if (anu.action == 'remove') {
+                } else if (anu.action === 'remove') {
                     let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos de la cual preocuparse. ¡Ni regreses! 💅💢`;
                     await nino.sendMessage(anu.id, {
                         text: txt,
@@ -124,14 +132,17 @@ async function startNino() {
                     });
                 }
             }
-        } catch (err) { console.log(err); }
+        } catch (err) { 
+            console.log('Error en Welcome System:', err); 
+        }
     });
 
+    // Enrutador de mensajes (Llama a tu handler.js)
     nino.ev.on('messages.upsert', async (chatUpdate) => {
         try {
             await handler(nino, chatUpdate);
         } catch (err) {
-            console.error(err);
+            console.error('Error en Handler:', err);
         }
     });
 }
