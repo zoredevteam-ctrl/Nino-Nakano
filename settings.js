@@ -9,7 +9,7 @@ global.prefix = '#';
 
 // Enlaces y Visuales
 global.rcanal = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y';
-global.banner = 'https://files.evogb.win/felix-nino-nakano.jpeg'; 
+global.banner = 'https://evogb.win/Nakano_Menu'; 
 
 // Mensajes de Sistema (Estilo Tsundere 🦋)
 global.mess = {
