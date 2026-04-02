@@ -2,7 +2,8 @@ const {
     default: makeWASocket, 
     useMultiFileAuthState, 
     DisconnectReason, 
-    fetchLatestBaileysVersion 
+    fetchLatestBaileysVersion,
+    Browsers // <-- Importación necesaria para arreglar el código de vinculación
 } = require('@whiskeysockets/baileys');
 
 const pino = require('pino');
@@ -21,6 +22,7 @@ async function startNino() {
     const { version, isLatest } = await fetchLatestBaileysVersion();
 
     console.clear();
+    // ASCII Art con espaciado uniforme
     console.log(chalk.hex('#FF69B4').bold(`
     ███╗   ██╗██╗███╗   ██╗ ██████╗ 
     ████╗  ██║██║████╗  ██║██╔═══██╗
@@ -28,12 +30,12 @@ async function startNino() {
     ██║╚██╗██║██║██║╚██╗██║██║   ██║
     ██║ ╚████║██║██║ ╚████║╚██████╔╝
     ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
-    ███╗   ██╗ █████╗ ██╗  ██╗ █████╗ ███╗   ██╗ ██████╗ 
+    ███╗   ██╗█████╗ ██╗  ██╗█████╗ ███╗   ██╗██████╗ 
     ████╗  ██║██╔══██╗██║ ██╔╝██╔══██╗████╗  ██║██╔═══██╗
     ██╔██╗ ██║███████║█████╔╝ ███████║██╔██╗ ██║██║   ██║
     ██║╚██╗██║██╔══██║██╔═██╗ ██╔══██║██║╚██╗██║██║   ██║
     ██║ ╚████║██║  ██║██║  ██╗██║  ██║██║ ╚████║╚██████╔╝
-    ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝`));
+    ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝`));
     console.log(chalk.white.bold('                 power by 𝓐𝓪𝓻𝓸𝓶\n'));
     console.log(chalk.gray(`Motor: Baileys v${version.join('.')} ${isLatest ? '(Actualizado)' : ''}\n`));
 
@@ -50,7 +52,8 @@ async function startNino() {
         logger: pino({ level: 'silent' }),
         printQRInTerminal: method === '2',
         auth: state,
-        browser: ["Z0RT SYSTEMS", "Chrome", "2.0.0"],
+        // Usamos una configuración estándar para evitar el bloqueo de WhatsApp
+        browser: Browsers.ubuntu('Chrome'), 
         generateHighQualityLinkPreview: true,
         getMessage: async (key) => {
             return { conversation: 'Nino Nakano está procesando este mensaje...' };
@@ -59,8 +62,21 @@ async function startNino() {
 
     if (method === '1' && !nino.authState.creds.registered) {
         const phoneNumber = await question(chalk.cyan('\nIngresa tu número de WhatsApp (ej: 573123456789):\n> '));
-        const code = await nino.requestPairingCode(phoneNumber.trim());
-        console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n');
+        
+        // Un pequeño retraso asegura que el socket esté listo para solicitar el código
+        setTimeout(async () => {
+            try {
+                // Limpiamos cualquier espacio o carácter raro del número
+                let numeroLimpio = phoneNumber.trim().replace(/[^0-9]/g, '');
+                let code = await nino.requestPairingCode(numeroLimpio);
+                
+                // Formateamos el código para que sea más legible (ej: 1234-5678)
+                let formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+                console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(formattedCode) + '\n');
+            } catch (err) {
+                console.log(chalk.red('\nError al solicitar el código. Asegúrate de que el número sea correcto y no esté baneado: '), err.message);
+            }
+        }, 2000); // 2 segundos de espera
     }
 
     nino.ev.on('connection.update', async (update) => {
@@ -82,7 +98,7 @@ async function startNino() {
             } 
             else if (reason === DisconnectReason.connectionClosed) { 
                 console.log(chalk.yellow("Conexión cerrada, reconectando..."));
-                setTimeout(() => startNino(), 3000); // ✅ Espera antes de reconectar
+                setTimeout(() => startNino(), 3000);
             }
             else if (reason === DisconnectReason.connectionLost) { 
                 console.log(chalk.yellow("Conexión perdida, reconectando..."));
@@ -98,7 +114,6 @@ async function startNino() {
             }
             else { 
                 console.log(chalk.white(`Desconexión desconocida: ${reason}`));
-                // ✅ FIX: Timeout para evitar bucle infinito de reconexiones
                 setTimeout(() => startNino(), 5000);
             }
 
