@@ -3,7 +3,7 @@ const fs = require('fs');
 // Configuración de Identidad
 global.botName = 'Nino Nakano';
 global.ownerName = 'Z0RT SYSTEMS';
-global.ownerNumber = '57XXXXXXXXX'; // Tu número sin el @s.whatsapp.net
+global.ownerNumber = '573107400303'; // Tu número sin el @s.whatsapp.net
 global.prefix = '#';
 
 // Enlaces y Visuales
