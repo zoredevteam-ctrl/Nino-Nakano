@@ -8,7 +8,7 @@ global.prefix = '#';
 
 // Enlaces y Visuales
 global.rcanal = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y';
-global.banner = 'https://i.pinimg.com/736x/d6/33/16/d633161c60668b556f8f53765e94b294.jpg'; // Imagen de Nino 🦋
+global.banner = 'https://files.evogb.win/felix-nino-nakano.jpeg'; // Imagen de Nino 🦋
 
 // Mensajes de Sistema (Estilo Tsundere)
 global.mess = {
