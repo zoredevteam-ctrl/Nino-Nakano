@@ -1,11 +1,11 @@
 # 🦋 NINO NAKANO - WHATSAPP BOT 🦋
 
 <p align="center">
-  <img src="[attachment_0](attachment)" alt="Nino Nakano" width="800">
+  <img src="https://evogb.win/Nakano_Menu" alt="Nino Nakano" width="800">
 </p>
 
 <p align="center">
-  <a href="https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y"><img src="https://img.shields.io/badge/Canal-WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Canal de WhatsApp"></a>
+  <a href="https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y"><img src="tps://img.shields.io/badge/Canal-WhatsApp-25D366?style=for-the-badge&logo=whatsapp&logoColor=white" alt="Canal de WhatsApp"></a>
   <img src="https://img.shields.io/badge/Status-Online-brightgreen?style=for-the-badge" alt="Status">
   <img src="https://img.shields.io/badge/Power_By-𝓐𝓪𝓻𝓸𝓶-FF69B4?style=for-the-badge" alt="Creador">
 </p>
