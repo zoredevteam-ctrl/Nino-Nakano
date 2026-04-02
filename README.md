@@ -65,14 +65,3 @@ Si quieres mejorar a Nino, ¡adelante! Los pull requests son bienvenidos. Solo m
 <p align="center">
 Desarrollado con ❤️ y mucha actitud tsundere. 🦋
 </p>
-
-### ¿Qué hace especial a este README?
-
-1.  **Visuales Impactantes:** Incluye la imagen que buscamos de Nino con estética cyberpunk para que el repositorio se vea increíble.
-2.  **Badges Profesionales:** Tiene botones que enlazan directamente a tu canal de WhatsApp y muestran quién es el creador.
-3.  **Guía de Instalación:** Está masticadito para que cualquier persona que entre a tu GitHub sepa cómo instalarlo en Termux.
-4.  **Personalidad:** Mantiene el tono de "Nino Nakano" en las frases introductorias.
-
-¿Te late como quedó, o quieres que le agreguemos alguna sección extra de comandos? 🦋✨
-
-
