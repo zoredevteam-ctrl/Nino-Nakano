@@ -1,7 +1,18 @@
 const { printLog } = require('./lib/print');
 const { decodeJid } = require('./lib/simple');
 const db = require('./lib/database');
+const fs = require('fs');
+const path = require('path');
 require('./settings');
+
+const plugins = {};
+const pluginsFolder = path.join(__dirname, 'plugins');
+const pluginFiles = fs.readdirSync(pluginsFolder).filter(file => file.endsWith('.js'));
+
+for (const file of pluginFiles) {
+    const plugin = require(path.join(pluginsFolder, file));
+    plugins[file] = plugin;
+}
 
 module.exports = async (nino, chatUpdate) => {
     try {
@@ -43,37 +54,41 @@ module.exports = async (nino, chatUpdate) => {
         }
 
         if (isCmd) {
-            switch (command) {
-                case 'menu':
-                case 'help':
-                    let menuText = `🦋 *NINO NAKANO SYSTEM* 🦋\n\n`;
-                    menuText += `¡Oye! No creas que hago esto porque me agradas, tonto. 🙄\n\n`;
-                    menuText += `╭─── • *ESTADO* • ───\n`;
-                    menuText += `│ 👤 *Usuario:* ${pushname}\n`;
-                    menuText += `│ 💎 *Premium:* ${db.data.users[sender].premium ? 'Activo' : 'No'}\n`;
-                    menuText += `│ 📊 *Nivel:* ${db.data.users[sender].level}\n`;
-                    menuText += `╰────────────────────\n\n`;
-                    menuText += `╭─── • *COMANDOS* • ───\n`;
-                    menuText += `│ ✨ ${global.prefix}ping\n`;
-                    menuText += `│ 👤 ${global.prefix}owner\n`;
-                    menuText += `│ 🦋 ${global.prefix}menu\n`;
-                    menuText += `╰────────────────────\n\n`;
-                    menuText += `_Powered by ${global.ownerName}_`;
-
-                    await nino.sendMessage(from, { text: menuText }, { quoted: m });
+            let executed = false;
+            for (const name in plugins) {
+                const plugin = plugins[name];
+                if (plugin.command && plugin.command.includes(command)) {
+                    await plugin(nino, m, { 
+                        from, 
+                        sender, 
+                        senderNumber, 
+                        args, 
+                        text, 
+                        isOwner, 
+                        isGroup, 
+                        pushname 
+                    });
+                    executed = true;
                     break;
+                }
+            }
 
-                case 'ping':
-                    await nino.sendMessage(from, { text: '¡Idiota! El bot está activo. Latencia mínima detectada. ✨' }, { quoted: m });
-                    break;
-
-                case 'owner':
-                    if (!isOwner) return nino.sendMessage(from, { text: global.mess.owner }, { quoted: m });
-                    await nino.sendMessage(from, { text: 'Hola, mi único dueño. Mi sistema está a tus órdenes. 💜' }, { quoted: m });
-                    break;
-
-                default:
-                    break;
+            if (!executed) {
+                switch (command) {
+                    case 'menu':
+                    case 'help':
+                        let menuText = `🦋 *NINO NAKANO SYSTEM* 🦋\n\n`;
+                        menuText += `╭─── • *USUARIO* • ───\n`;
+                        menuText += `│ 👤 *Nombre:* ${pushname}\n`;
+                        menuText += `│ 📊 *Nivel:* ${db.data.users[sender].level}\n`;
+                        menuText += `╰────────────────────\n\n`;
+                        menuText += `╭─── • *COMANDOS* • ───\n`;
+                        menuText += `│ ✨ ${global.prefix}ping / ${global.prefix}p\n`;
+                        menuText += `│ 👤 ${global.prefix}owner\n`;
+                        menuText += `╰────────────────────`;
+                        await nino.sendMessage(from, { text: menuText }, { quoted: m });
+                        break;
+                }
             }
         }
     } catch (err) {
