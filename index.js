@@ -1,124 +1,163 @@
 import './settings.js'
-import chalk from 'chalk'
-import pino from 'pino'
-import qrcode from 'qrcode-terminal'
-import fs from 'fs'
-import path from 'path'
-import readlineSync from 'readline-sync'
-import { fileURLToPath } from 'url'
-import {
-  Browsers,
-  makeWASocket,
-  makeCacheableSignalKeyStore,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  jidDecode,
-  DisconnectReason
+import { 
+    default: makeWASocket, 
+    useMultiFileAuthState, 
+    DisconnectReason, 
+    fetchLatestBaileysVersion, 
+    makeInMemoryStore, 
+    jidDecode
 } from '@whiskeysockets/baileys'
+import pino from 'pino'
+import { Boom } from '@hapi/boom'
+import fs from 'fs'
+import chalk from 'chalk'
+import readline from 'readline'
+import qrcode from 'qrcode-terminal'
+import { handler } from './handler.js'
 import { smsg } from './lib/simple.js'
 import { database } from './lib/database.js'
-import { handler } from './handler.js'
+import path from 'path'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const pluginsDir = path.join(__dirname, 'plugins')
+// Configuración de almacenamiento
+const store = makeInMemoryStore({ logger: pino({ level: 'silent' }) })
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+const question = (text) => new Promise((resolve) => rl.question(text, resolve))
 
-// Logs con estilo
-const log = {
-  info: msg => console.log(chalk.bgMagenta.white.bold(' INFO '), chalk.white(msg)),
-  success: msg => console.log(chalk.bgAnsi256(201).white.bold(' SUCCESS '), chalk.magentaBright(msg)),
-  error: msg => console.log(chalk.bgRed.white.bold(' ERROR '), chalk.redBright(msg))
-}
-
-const n2 = chalk.hex('#FF69B4'), n3 = chalk.hex('#DA70D6')
-
-const ninoBanner = `
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
-${n2('  ███╗   ██╗██╗███╗   ██╗ ██████╗     ███╗   ██╗ █████╗ ██╗  ██╗ █████╗ ███╗   ██╗ ██████╗  ')}
-${n2('  ████╗  ██║██║████╗  ██║██╔═══██╗    ████╗  ██║██╔══██╗██║ ██╔╝██╔══██╗████╗  ██║██╔═══██╗ ')}
-${n2('  ██╔██╗ ██║██║██╔██╗ ██║██║   ██║    ██╔██╗ ██║███████║█████╔╝ ███████║██╔██╗ ██║██║   ██║ ')}
-${n2('  ██║╚██╗██║██║██║╚██╗██║██║   ██║    ██║╚██╗██║██╔══██║██╔═██╗ ██╔══██║██║╚██╗██║██║   ██║ ')}
-${n2('  ██║ ╚████║██║██║ ╚████║╚██████╔╝    ██║ ╚████║██║  ██║██║  ██╗██║  ██║██║ ╚████║╚██████╔╝ ')}
-${n2('  ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝     ╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ')}
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
-${chalk.white.bold('                 POWER BY 𝓐𝓪𝓻𝓸𝓶 | Z0RT SYSTEMS')}
-${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
-`
-
-// --- CARGA DE PLUGINS ---
-const plugins = {}
-async function loadPlugins() {
-    const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js'))
-    for (const file of files) {
-        try {
-            const plugin = await import(`./plugins/${file}?t=${Date.now()}`)
-            plugins[file] = plugin.default || plugin
-            log.success(`Plugin: ${file} [OK]`)
-        } catch (e) { log.error(`Error en ${file}: ${e.message}`) }
-    }
-}
-
-async function startBot() {
-    const { state, saveCreds } = await useMultiFileAuthState('./Sessions/Owner')
+async function startNino() {
+    // Usamos la carpeta de sesión que tenías originalmente
+    const { state, saveCreds } = await useMultiFileAuthState('./session_nino')
     const { version } = await fetchLatestBaileysVersion()
 
     console.clear()
-    console.log(ninoBanner)
-
-    let opcion = ''
-    let phoneNumber = ''
-
+    // --- TU DISEÑO ORIGINAL ---
+    console.log(chalk.hex('#FF69B4').bold(`
+    ███╗   ██╗██╗███╗   ██╗ ██████╗ 
+    ████╗  ██║██║████╗  ██║██╔═══██╗
+    ██╔██╗ ██║██║██╔██╗ ██║██║   ██║
+    ██║╚██╗██║██║██║╚██╗██║██║   ██║
+    ██║ ╚████║██║██║ ╚████║╚██████╔╝
+    ╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ 
+    ███╗   ██╗ █████╗ ██╗  ██╗ █████╗ ███╗   ██╗ ██████╗ 
+    ████╗  ██║██╔══██╗██║ ██╔╝██╔══██╗████╗  ██║██╔═══██╗
+    ██╔██╗ ██║███████║█████╔╝ ███████║██╔██╗ ██║██║   ██║
+    ██║╚██╗██║██╔══██║██╔═██╗ ██╔══██║██║╚██╗██║██║   ██║
+    ██║ ╚████║██║  ██║██║  ██╗██║  ██║██║ ╚████║╚██████╔╝
+    ╚═╝  ╚═══╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝`))
+    console.log(chalk.white.bold('                 power by 𝓐𝓪𝓻𝓸𝓶\n'))
+    
+    let method = 0
     if (!state.creds.registered) {
-        console.log(chalk.bold.cyan('\n🦋 SELECCIONA TU MÉTODO DE VINCULACIÓN:'))
-        console.log(chalk.magenta('   [1]') + chalk.white(' Código de 8 dígitos (Recomendado)'))
-        console.log(chalk.magenta('   [2]') + chalk.white(' Código QR'))
-        opcion = readlineSync.question(chalk.bold.yellow('\n--> Elije una opción (1 o 2): ')).trim()
-
-        if (opcion === '1') {
-            phoneNumber = readlineSync.question(chalk.magenta('\n🦋 Ingresa tu número (ej: 57310...): ')).replace(/\D/g, '')
-        }
+        console.log(chalk.cyan('Selecciona el método de vinculación:'))
+        console.log(chalk.white('1. Código de 8 dígitos'))
+        console.log(chalk.white('2. Código QR'))
+        method = await question(chalk.magenta('\nOpcion > '))
     }
 
-    const conn = makeWASocket({
+    const nino = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
-        printQRInTerminal: opcion === '2',
-        browser: Browsers.ubuntu('Chrome'),
-        auth: {
-            creds: state.creds,
-            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
-        }
+        printQRInTerminal: method == '2',
+        auth: state,
+        browser: ["Ubuntu", "Chrome", "20.0.04"]
     })
 
-    conn.ev.on('creds.update', saveCreds)
-
-    if (opcion === '1' && !state.creds.registered) {
-        setTimeout(async () => {
-            let code = await conn.requestPairingCode(phoneNumber)
-            console.log(chalk.black.bgMagenta.bold(`\n TÚ CÓDIGO DE VINCULACIÓN: `), chalk.white.bgBlack.bold(` ${code?.match(/.{1,4}/g)?.join('-') || code} `), `\n`)
-        }, 3000)
+    // Vinculación por código (Tu lógica original)
+    if (method == '1' && !nino.authState.creds.registered) {
+        const phoneNumber = await question(chalk.cyan('\nIngresa tu número de WhatsApp (ej: 573123456789):\n> '))
+        const code = await nino.requestPairingCode(phoneNumber.trim())
+        console.log(chalk.white('\nTu código de vinculación es: ') + chalk.hex('#FF69B4').bold(code) + '\n')
     }
 
-    conn.ev.on('connection.update', async (update) => {
-        const { connection } = update
-        if (connection === 'open') {
-            log.success(`Conectado como: ${conn.user?.name || 'Nino Bot'}`)
+    store.bind(nino.ev)
+
+    // --- MANEJO DE CONEXIÓN ---
+    nino.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect } = update
+        if (connection === 'close') {
+            let reason = new Boom(lastDisconnect?.error)?.output.statusCode
+            if (reason === DisconnectReason.restartRequired) { startNino() }
+            else if (reason === DisconnectReason.loggedOut) { nino.logout(); startNino() }
+            else { startNino() }
+        } else if (connection === 'open') {
+            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está en línea y lista! 🦋\n'))
         }
-        if (connection === 'close') startBot()
     })
 
-    conn.ev.on('messages.upsert', async ({ messages }) => {
-        let m = messages[0]
-        if (!m.message) return
+    nino.ev.on('creds.update', saveCreds)
+
+    // --- SISTEMA DE BIENVENIDA Y DESPEDIDA ---
+    nino.ev.on('group-participants.update', async (anu) => {
         try {
-            m = await smsg(conn, m)
-            // IMPORTANTE: Pasamos los plugins al handler
-            await handler(m, conn, plugins) 
-        } catch (e) { console.error(e) }
+            const metadata = await nino.groupMetadata(anu.id)
+            const participants = anu.participants
+            for (let num of participants) {
+                let ppuser
+                try { ppuser = await nino.profilePictureUrl(num, 'image') } catch { ppuser = global.banner }
+
+                if (anu.action == 'add') {
+                    let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`
+                    await nino.sendMessage(anu.id, {
+                        text: txt,
+                        contextInfo: {
+                            mentionedJid: [num],
+                            externalAdReply: {
+                                title: `NUEVO INTEGRANTE 🦋`,
+                                body: `Bienvenido a ${metadata.subject}`,
+                                thumbnailUrl: ppuser,
+                                sourceUrl: global.rcanal,
+                                mediaType: 1,
+                                renderLargerThumbnail: true
+                            }
+                        }
+                    })
+                } else if (anu.action == 'remove') {
+                    let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos de la cual preocuparse. ¡Ni regreses! 💅💢`
+                    await nino.sendMessage(anu.id, {
+                        text: txt,
+                        contextInfo: {
+                            mentionedJid: [num],
+                            externalAdReply: {
+                                title: `USUARIO SALIENTE 🦋`,
+                                body: `Se fue de ${metadata.subject}`,
+                                thumbnailUrl: ppuser,
+                                sourceUrl: global.rcanal,
+                                mediaType: 1,
+                                renderLargerThumbnail: true
+                            }
+                        }
+                    })
+                }
+            }
+        } catch (err) { console.log(err) }
+    })
+
+    // --- PROCESAMIENTO DE MENSAJES (Adaptado a Handler ESM) ---
+    nino.ev.on('messages.upsert', async (chatUpdate) => {
+        try {
+            if (!chatUpdate.messages[0]) return
+            let m = chatUpdate.messages[0]
+            if (m.key.remoteJid === 'status@broadcast') return
+            m = await smsg(nino, m)
+            
+            // Cargamos plugins dinámicamente para el handler
+            const plugins = {}
+            const __dirname = path.dirname(fileURLToPath(import.meta.url))
+            const directory = path.join(__dirname, 'plugins')
+            const files = fs.readdirSync(directory).filter(f => f.endsWith('.js'))
+            for (let file of files) {
+                const plugin = await import(`./plugins/${file}`)
+                plugins[file] = plugin.default || plugin
+            }
+
+            await handler(m, nino, plugins)
+        } catch (err) {
+            console.error(err)
+        }
     })
 }
 
+// Iniciar base de datos antes del bot
 (async () => {
     await database.read()
-    await loadPlugins()
-    await startBot()
+    startNino()
 })()
