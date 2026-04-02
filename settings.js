@@ -3,8 +3,10 @@ const fs = require('fs');
 // Configuración de Identidad
 global.botName = 'Nino Nakano';
 global.ownerName = 'Z0RT SYSTEMS & Félix';
-// Lista de dueños autorizados
+
+// LISTA DE DUEÑOS AUTORIZADOS (Aquí está la variable clave)
 global.owners = ['573107400303', '573508941325']; 
+
 global.prefix = '#';
 
 // Enlaces y Visuales
