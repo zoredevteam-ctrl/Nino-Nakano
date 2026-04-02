@@ -2,105 +2,90 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
-// Forzamos la carga de settings para evitar el error de "undefined"
-try {
-    require('./settings');
-} catch (e) {
-    console.error('⚠️ Error al cargar settings.js:', e.message);
+// Forzamos la carga de settings cada vez que el archivo cambia
+function checkSettings() {
+    try {
+        delete require.cache[require.resolve('./settings')];
+        require('./settings');
+    } catch (e) {
+        console.log(chalk.red('❌ Error crítico: No se pudo cargar settings.js'));
+    }
 }
+checkSettings();
 
 module.exports = async (nino, chatUpdate) => {
     try {
         const m = chatUpdate.messages[0];
         if (!m || !m.message) return;
-        
-        // Ignorar mensajes de estado/status
         if (m.key && m.key.remoteJid === 'status@broadcast') return;
         
         const from = m.key.remoteJid;
         const type = Object.keys(m.message)[0];
         const sender = m.key.participant || m.key.remoteJid;
-        const senderNumber = sender.split('@')[0]; // Ejemplo: 57310...
+        
+        // Verificación de seguridad para el remitente
+        if (!sender) return;
+        const senderNumber = sender.split('@')[0];
 
-        // --- EXTRACCIÓN DEL CUERPO DEL MENSAJE ---
+        // --- EXTRACCIÓN DE TEXTO ---
         const body = (type === 'conversation') ? m.message.conversation : 
                      (type === 'extendedTextMessage') ? m.message.extendedTextMessage.text : 
                      (type === 'imageMessage') ? m.message.imageMessage.caption : 
                      (type === 'videoMessage') ? m.message.videoMessage.caption : '';
         
+        // Si no hay prefijo configurado, usamos '#' por defecto
         const prefix = global.prefix || '#';
         const isCmd = body.startsWith(prefix);
         const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(' ');
 
-        // --- 🛡️ ESCUDO DEFINITIVO PARA EL OWNER (LÍNEA CRÍTICA) ---
-        // Si global.owners no existe, creamos un array vacío al vuelo para evitar el error .includes()
-        let ownerList = Array.isArray(global.owners) ? global.owners : [];
-        if (ownerList.length === 0) {
-            // Re-intento de carga si la variable está vacía
-            try { 
-                delete require.cache[require.resolve('./settings')]; 
-                require('./settings'); 
-                ownerList = global.owners || [];
-            } catch {}
-        }
-        const isOwner = ownerList.includes(senderNumber);
+        // --- 🛡️ VALIDACIÓN DE OWNER ULTRA-SEGURA ---
+        // Si global.owners no existe, usamos una lista vacía para que no explote el .includes
+        const currentOwners = Array.isArray(global.owners) ? global.owners : [];
+        const isOwner = currentOwners.includes(senderNumber);
         
         // --- METADATOS DE GRUPO ---
         const isGroup = from.endsWith('@g.us');
         const groupMetadata = isGroup ? await nino.groupMetadata(from).catch(() => ({})) : {};
         const participants = isGroup ? (groupMetadata.participants || []) : [];
-        
-        // Verificación de Admins
         const userAdmin = isGroup ? !!participants.find(p => p.id === sender)?.admin : false;
         const botAdmin = isGroup ? !!participants.find(p => p.id === (nino.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false;
 
-        // --- LOG DE CONSOLA (ESTILO NINO NAKANO) ---
+        // --- LOG EN CONSOLA (Sin spam en WhatsApp) ---
         if (isCmd) {
-            console.log(chalk.hex('#FF69B4').bold('\n---------- [ 🦋 NUEVO COMANDO 🦋 ] ----------'));
-            console.log(chalk.white(`🌹 Usuario: ${senderNumber} ${isOwner ? chalk.yellow('(OWNER)') : ''}`));
-            console.log(chalk.white(`🌹 Comando: ${prefix}${command}`));
-            console.log(chalk.white(`🌹 Canal: ${isGroup ? groupMetadata.subject : 'Chat Privado'}`));
-            console.log(chalk.hex('#FF69B4').bold('---------------------------------------------\n'));
+            console.log(chalk.magenta(`[ CMD ] ${prefix}${command} | de: ${senderNumber}`));
         }
 
-        // --- ENRUTADOR DE PLUGINS ---
+        // --- LECTURA DE PLUGINS ---
         const pluginPath = path.join(__dirname, 'plugins');
-        if (!fs.existsSync(pluginPath)) fs.mkdirSync(pluginPath);
-        
-        const files = fs.readdirSync(pluginPath);
+        const files = fs.readdirSync(pluginPath).filter(f => f.endsWith('.js'));
+
         for (let file of files) {
-            if (file.endsWith('.js')) {
-                try {
-                    const pluginPathFull = path.join(pluginPath, file);
-                    // Limpiamos caché para actualizaciones en tiempo real
-                    delete require.cache[require.resolve(pluginPathFull)];
-                    const plugin = require(pluginPathFull);
-                    
-                    if (plugin.command && (Array.isArray(plugin.command) ? plugin.command.includes(command) : plugin.command === command)) {
-                        await plugin(nino, m, {
-                            from, isGroup, isOwner, userAdmin, botAdmin, args, text, sender,
-                            pushname: m.pushName || 'Usuario'
-                        });
-                    }
-                } catch (pluginErr) {
-                    console.error(chalk.yellow(`Aviso en el plugin ${file}:`), pluginErr.message);
+            try {
+                const plugin = require(path.join(pluginPath, file));
+                if (plugin.command && (Array.isArray(plugin.command) ? plugin.command.includes(command) : plugin.command === command)) {
+                    await plugin(nino, m, {
+                        from, isGroup, isOwner, userAdmin, botAdmin, args, text, sender,
+                        pushname: m.pushName || 'Usuario'
+                    });
                 }
+            } catch (pluginErr) {
+                console.log(chalk.red(`❌ Error en plugin: ${file} ->`), pluginErr.message);
             }
         }
 
     } catch (err) {
-        // Error controlado para no crashear el proceso
-        console.log(chalk.red.bold('ERROR_EN_HANDLER:'), err.message);
+        // 🚨 IMPORTANTE: Solo logueamos el error en consola para evitar spam en WhatsApp
+        console.log(chalk.bgRed.white(' ERROR EN EL HANDLER '), chalk.red(err.stack));
     }
 };
 
-// AUTO-RECARGA (HOT RELOAD)
+// Auto-update
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
     fs.unwatchFile(file);
-    console.log(chalk.hex('#FF69B4').bold('¡Handler actualizado correctamente! 🦋✨'));
+    console.log(chalk.green('Handler actualizado correctamente.'));
     delete require.cache[file];
     require(file);
 });
