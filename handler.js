@@ -2,62 +2,60 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
-// Forzamos la carga de settings cada vez que el archivo cambia
-function checkSettings() {
-    try {
-        delete require.cache[require.resolve('./settings')];
-        require('./settings');
-    } catch (e) {
-        console.log(chalk.red('❌ Error crítico: No se pudo cargar settings.js'));
-    }
+// Aseguramos que las configuraciones existan desde el arranque
+try {
+    require('./settings');
+} catch (e) {
+    console.log(chalk.red('❌ Error: No se pudo cargar settings.js'));
 }
-checkSettings();
 
 module.exports = async (nino, chatUpdate) => {
     try {
         const m = chatUpdate.messages[0];
         if (!m || !m.message) return;
-        if (m.key && m.key.remoteJid === 'status@broadcast') return;
         
+        // --- 1. BLOQUEO DE AUTO-SPAM (CRÍTICO) ---
+        // Si el mensaje lo envió el propio bot, lo ignoramos para evitar bucles.
+        if (m.key.fromMe) return;
+        
+        // Ignorar mensajes de estado
+        if (m.key.remoteJid === 'status@broadcast') return;
+
         const from = m.key.remoteJid;
         const type = Object.keys(m.message)[0];
         const sender = m.key.participant || m.key.remoteJid;
-        
-        // Verificación de seguridad para el remitente
-        if (!sender) return;
-        const senderNumber = sender.split('@')[0];
+        const senderNumber = sender ? sender.split('@')[0] : '';
 
-        // --- EXTRACCIÓN DE TEXTO ---
+        // --- 2. EXTRACCIÓN DE TEXTO ---
         const body = (type === 'conversation') ? m.message.conversation : 
                      (type === 'extendedTextMessage') ? m.message.extendedTextMessage.text : 
                      (type === 'imageMessage') ? m.message.imageMessage.caption : 
                      (type === 'videoMessage') ? m.message.videoMessage.caption : '';
         
-        // Si no hay prefijo configurado, usamos '#' por defecto
         const prefix = global.prefix || '#';
         const isCmd = body.startsWith(prefix);
         const command = isCmd ? body.slice(prefix.length).trim().split(' ').shift().toLowerCase() : '';
         const args = body.trim().split(/ +/).slice(1);
         const text = args.join(' ');
 
-        // --- 🛡️ VALIDACIÓN DE OWNER ULTRA-SEGURA ---
-        // Si global.owners no existe, usamos una lista vacía para que no explote el .includes
-        const currentOwners = Array.isArray(global.owners) ? global.owners : [];
-        const isOwner = currentOwners.includes(senderNumber);
+        // --- 3. VALIDACIÓN DE DUEÑO (SEGURA) ---
+        // Si global.owners no carga, usamos un array vacío para que no tire error de "includes"
+        const owners = Array.isArray(global.owners) ? global.owners : [];
+        const isOwner = owners.includes(senderNumber);
         
-        // --- METADATOS DE GRUPO ---
+        // --- 4. METADATOS DE GRUPO ---
         const isGroup = from.endsWith('@g.us');
         const groupMetadata = isGroup ? await nino.groupMetadata(from).catch(() => ({})) : {};
         const participants = isGroup ? (groupMetadata.participants || []) : [];
         const userAdmin = isGroup ? !!participants.find(p => p.id === sender)?.admin : false;
         const botAdmin = isGroup ? !!participants.find(p => p.id === (nino.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin : false;
 
-        // --- LOG EN CONSOLA (Sin spam en WhatsApp) ---
+        // --- 5. LOG DE CONSOLA ---
         if (isCmd) {
-            console.log(chalk.magenta(`[ CMD ] ${prefix}${command} | de: ${senderNumber}`));
+            console.log(chalk.hex('#FF69B4').bold(`[ CMD ] ${prefix}${command} | Usuario: ${senderNumber}`));
         }
 
-        // --- LECTURA DE PLUGINS ---
+        // --- 6. EJECUTOR DE PLUGINS ---
         const pluginPath = path.join(__dirname, 'plugins');
         const files = fs.readdirSync(pluginPath).filter(f => f.endsWith('.js'));
 
@@ -70,22 +68,22 @@ module.exports = async (nino, chatUpdate) => {
                         pushname: m.pushName || 'Usuario'
                     });
                 }
-            } catch (pluginErr) {
-                console.log(chalk.red(`❌ Error en plugin: ${file} ->`), pluginErr.message);
+            } catch (err) {
+                console.error(chalk.red(`Error en plugin ${file}:`), err.message);
             }
         }
 
     } catch (err) {
-        // 🚨 IMPORTANTE: Solo logueamos el error en consola para evitar spam en WhatsApp
-        console.log(chalk.bgRed.white(' ERROR EN EL HANDLER '), chalk.red(err.stack));
+        // Logueamos el error en Termux, pero NO mandamos mensaje al chat para evitar bucles.
+        console.log(chalk.bgRed.white(' ERROR EN HANDLER '), chalk.red(err.stack));
     }
 };
 
-// Auto-update
+// Hot reload
 let file = require.resolve(__filename);
 fs.watchFile(file, () => {
     fs.unwatchFile(file);
-    console.log(chalk.green('Handler actualizado correctamente.'));
+    console.log(chalk.green('¡Handler actualizado! 🦋'));
     delete require.cache[file];
     require(file);
 });
