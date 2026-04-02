@@ -1,120 +1,198 @@
-const { 
-    default: makeWASocket, 
-    useMultiFileAuthState, 
-    DisconnectReason, 
-    fetchLatestBaileysVersion,
-    Browsers,
-    makeCacheableSignalKeyStore
-} = require('@whiskeysockets/baileys');
+import './settings.js'
+import chalk from 'chalk'
+import pino from 'pino'
+import qrcode from 'qrcode-terminal'
+import fs from 'fs'
+import path from 'path'
+import readlineSync from 'readline-sync'
+import { fileURLToPath } from 'url'
+import {
+  Browsers,
+  makeWASocket,
+  makeCacheableSignalKeyStore,
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  jidDecode,
+  DisconnectReason
+} from '@whiskeysockets/baileys'
+import { exec } from 'child_process'
+import { smsg } from './lib/simple.js'
+import { database } from './lib/database.js'
+import { handler, loadEvents } from './handler.js'
 
-const pino = require('pino');
-const { Boom } = require('@hapi/boom');
-const fs = require('fs');
-const chalk = require('chalk');
-const readline = require('readline');
-const handler = require('./handler');
-require('./settings');
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const pluginsDir = path.join(__dirname, 'plugins')
+const SUBBOTS_DIR = './Sessions/SubBots'
+global.conns = []
 
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-const question = (text) => new Promise((resolve) => rl.question(text, resolve));
-
-async function startNino() {
-    const { state, saveCreds } = await useMultiFileAuthState('./session_nino');
-    const { version, isLatest } = await fetchLatestBaileysVersion();
-
-    console.clear();
-    // ASCII ART REFORMADO (Ajustado para pantallas de Termux)
-    console.log(chalk.hex('#FF69B4').bold(`
-  _   _ _               _   _       _                      
- | \\ | (_)             | \\ | |     | |                     
- |  \\| |_ _ __   ___   |  \\| | __ _| | ____ _ _ __   ___  
- | . \` | | '_ \\ / _ \\  | . \` |/ _\` | |/ / _\` | '_ \\ / _ \\ 
- | |\\  | | | | | (_) | | |\\  | (_| |   < (_| | | | | (_) |
- |_| \\_|_|_| |_|\\___/  |_| \\_|\\__,_|_|\\_\\__,_|_| |_|\\___/ 
-                                             
-    ${chalk.white('---')} ${chalk.hex('#FF69B4')('B Y   A A R O M   |   Z 0 R T   S Y S T E M S')} ${chalk.white('---')}
-    `));
-    
-    console.log(chalk.gray(`Motor: Baileys v${version.join('.')} ${isLatest ? '(Estable)' : ''}\n`));
-
-    let method = 0;
-    if (!state.creds.registered) {
-        console.log(chalk.cyan('Selecciona el método:'));
-        console.log(chalk.white('1. Código de vinculación'));
-        console.log(chalk.white('2. Código QR'));
-        method = await question(chalk.magenta('\nOpcion > '));
-    }
-
-    const nino = makeWASocket({
-        version,
-        logger: pino({ level: 'silent' }),
-        printQRInTerminal: method === '2',
-        auth: {
-            creds: state.creds,
-            // 🛡️ PARCHE 1: Cacheable Signal Store para evitar el Bad MAC
-            keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-        },
-        browser: Browsers.ubuntu('Chrome'), 
-        generateHighQualityLinkPreview: true,
-        syncFullHistory: true, // 🛡️ PARCHE 2: Sincronizar historial ayuda a evitar errores de llave
-        markOnlineOnConnect: true,
-        // 🛡️ PARCHE 3: Reintentar envío si hay error de cifrado
-        shouldIgnoreJid: (jid) => isLatest && jid?.endsWith('@newsletter'),
-        getMessage: async (key) => {
-            return { conversation: 'Nino Nakano está procesando...' };
-        }
-    });
-
-    if (method === '1' && !nino.authState.creds.registered) {
-        const phoneNumber = await question(chalk.cyan('\nIngresa tu número (ej: 573123456789):\n> '));
-        const numeroLimpio = phoneNumber.replace(/[^0-9]/g, '');
-
-        setTimeout(async () => {
-            try {
-                let code = await nino.requestPairingCode(numeroLimpio);
-                code = code?.match(/.{1,4}/g)?.join('-') || code;
-                console.log(chalk.white('\nTU CÓDIGO: ') + chalk.hex('#FF69B4').bold(code) + '\n');
-            } catch (err) {
-                console.log(chalk.red('\nError al generar código: '), err.message);
-            }
-        }, 3000); 
-    }
-
-    nino.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect } = update;
-
-        if (connection === 'close') {
-            let reason = new Boom(lastDisconnect?.error)?.output.statusCode;
-
-            // 🛡️ PARCHE 4: Si el error es Bad MAC o Sesión inválida, borramos y reiniciamos
-            if (reason === DisconnectReason.loggedOut || reason === 411) { 
-                console.log(chalk.red.bold(`\n❌ Error crítico (Bad MAC). Limpiando sesión...`)); 
-                fs.rmSync('./session_nino', { recursive: true, force: true });
-                process.exit(0);
-            } 
-            else {
-                console.log(chalk.yellow(`\n🔄 Reconectando...`));
-                setTimeout(() => startNino(), 5000);
-            }
-        } else if (connection === 'open') {
-            console.log(chalk.hex('#FF69B4').bold('\n🦋 ¡Nino Nakano está lista! Ya puedes enviar comandos. 🦋\n'));
-        }
-    });
-
-    nino.ev.on('creds.update', saveCreds);
-
-    nino.ev.on('messages.upsert', async (chatUpdate) => {
-        try {
-            const m = chatUpdate.messages[0];
-            if (!m) return;
-            // 🛡️ PARCHE 5: Si el mensaje no se puede descifrar, lo ignoramos para no tirar error
-            if (m.messageStubType) return; 
-            
-            await handler(nino, chatUpdate);
-        } catch (err) {
-            console.error(chalk.red('Error en Handler:'), err.message);
-        }
-    });
+// Logs con estilo Nino
+const log = {
+  info: msg => console.log(chalk.bgMagenta.white.bold(' INFO '), chalk.white(msg)),
+  success: msg => console.log(chalk.bgAnsi256(201).white.bold(' SUCCESS '), chalk.magentaBright(msg)),
+  warn: msg => console.log(chalk.bgYellow.red.bold(' WARNING '), chalk.yellow(msg)),
+  error: msg => console.log(chalk.bgRed.white.bold(' ERROR '), chalk.redBright(msg))
 }
 
-startNino();
+const n1 = chalk.hex('#DDA0DD'), n2 = chalk.hex('#FF69B4'), n3 = chalk.hex('#DA70D6'), n4 = chalk.hex('#8B008B')
+
+const ninoBanner = `
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+${n1('             .⢀⡤⠤⠒⠒⢲⡖⠢⢤⣀.             ')}
+${n1('          ⢀⡠⠚⣁⠤⠤⠤⠤⢼⣷⠀⢀⡈⠓⢤.          ')}
+${n1('    ⢷⣤⣪⢖⡥⠒⠊⠉⢉⠉⠺⣿⣇⡀⠱⡀⠀⠱⡄.       ')}
+${n2('    ⢸⣿⡿⠋⠀⠀⠀⠀⠀⣧⢠⢠⠀⢣⠀⠹⡀⡀⠘⣆.      ')}
+${n2('    ⡯⡿⠁⡄⠀⠀⢰⣄⠀⢹⡆⢎⣆⠀⢣⠀⢱⢹⣆⠘⡄.     ')}
+${n2('   ⢸⠀⡗⡄⢡⠸⡀⠀⡞⡄⠘⣿⡸⣯⠳⡵⣄⠀⢇⡏⢆⠹⡄.    ')}
+${n2('   ⢸⡀⢱⢇⠘⣆⢳⡀⢹⣇⠀⢻⡑⣸⣤⣬⣿⡀⢸⢸⡌⢦⠱⡀.   ')}
+${n3('   ⠘⣧⠸⡜⣦⠹⡆⢳⣄⣿⡄⢺⢿⣽⣾⡈⠀⣧⠈⣾⣼⠄⢣⠹⡄.  ')}
+${n3('    ⢿⠀⢣⠙⣧⣿⣾⡏⠉⠀⠀⠀⠙⠉⠀⠀⢸⠀⢹⣿⡄⠀⠳⡹⣦⡀. ')}
+${n3('    ⠘⡇⠀⣿⣍⠙⠿⠁⠠⣄⠀⠀⠀⠀⠀⠀⢸⠀⢸⡏⢻⡄⠀⠘⢾⣗⢦.')}
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+${n2('      🦋  ')}${chalk.whiteBright.bold('N I N O  N A K A N O')}${n2('  🦋')}
+${chalk.gray('         ꕦ power by Arom ꕦ')}  ${chalk.gray('v' + global.botVersion)}
+${n3('🦋━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━🦋')}
+`
+
+// --- CARGA DE PLUGINS ---
+const plugins = new Map()
+async function loadPlugins () {
+  if (!fs.existsSync(pluginsDir)) fs.mkdirSync(pluginsDir, { recursive: true })
+  const files = fs.readdirSync(pluginsDir).filter(f => f.endsWith('.js'))
+  for (const file of files) {
+    try {
+      const filePath = path.join(pluginsDir, file)
+      const plugin = (await import(`${filePath}?t=${Date.now()}`)).default
+      if (plugin) { plugins.set(file, plugin); log.success(`Cargado: ${file}`) }
+    } catch (e) { log.error(`Error en ${file}: ${e.message}`) }
+  }
+}
+
+global.sessionName = global.sessionName || './Sessions/Owner'
+try { fs.mkdirSync(global.sessionName, { recursive: true }) } catch (e) {}
+
+const methodCodeQR = process.argv.includes('--qr')
+const methodCode = process.argv.includes('--code')
+
+let opcion = ''
+let phoneNumber = ''
+
+if (methodCodeQR) opcion = '1'
+else if (methodCode) opcion = '2'
+else if (!fs.existsSync(`${global.sessionName}/creds.json`)) {
+  opcion = readlineSync.question(chalk.bold.white('\nSelecciona método:\n') + chalk.magenta('1. QR | 2. Código\n--> '))
+  if (opcion === '2') {
+    phoneNumber = readlineSync.question(chalk.magenta('Número (ej: 57310...): ')).replace(/\D/g, '')
+  }
+}
+
+async function startBot () {
+  const { state, saveCreds } = await useMultiFileAuthState(global.sessionName)
+  const { version } = await fetchLatestBaileysVersion()
+
+  const conn = makeWASocket({
+    version,
+    logger: pino({ level: 'silent' }),
+    printQRInTerminal: false,
+    browser: Browsers.ubuntu('Chrome'),
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+    },
+    markOnlineOnConnect: true,
+    generateHighQualityLinkPreview: true,
+    getMessage: async () => ({ conversation: 'Nino Nakano está aquí.' })
+  })
+
+  global.conn = conn
+  conn.decodeJid = jid => {
+    if (!jid) return jid
+    const decode = jidDecode(jid) || {}
+    return decode.user && decode.server ? decode.user + '@' + decode.server : jid
+  }
+
+  conn.ev.on('creds.update', saveCreds)
+
+  // Vinculación por código
+  if (opcion === '2' && !state.creds.registered) {
+    setTimeout(async () => {
+      let code = await conn.requestPairingCode(phoneNumber)
+      console.log(chalk.magenta(`\n🦋 CÓDIGO: `) + chalk.white.bold(code?.match(/.{1,4}/g)?.join('-') || code) + '\n')
+    }, 3000)
+  }
+
+  // --- EVENTO DE CONEXIÓN ---
+  conn.ev.on('connection.update', async update => {
+    const { qr, connection, lastDisconnect } = update
+    if (qr && opcion === '1') qrcode.generate(qr, { small: true })
+    if (connection === 'open') {
+      console.log(ninoBanner)
+      log.success(`Online: ${conn.user?.name}`)
+      await loadEvents(conn)
+    }
+    if (connection === 'close') startBot()
+  })
+
+  // --- 🦋 SISTEMA DE BIENVENIDA Y DESPEDIDA (ESTILO NINO) 🦋 ---
+  conn.ev.on('group-participants.update', async (anu) => {
+    try {
+      const metadata = await conn.groupMetadata(anu.id)
+      const participants = anu.participants
+      for (let num of participants) {
+        let ppuser;
+        try { ppuser = await conn.profilePictureUrl(num, 'image') } catch { ppuser = global.banner }
+
+        if (anu.action === 'add') {
+          let txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`
+          await conn.sendMessage(anu.id, {
+            text: txt,
+            contextInfo: {
+              mentionedJid: [num],
+              externalAdReply: {
+                title: `NUEVO INTEGRANTE 🦋`,
+                body: `Bienvenido a ${metadata.subject}`,
+                thumbnailUrl: ppuser,
+                sourceUrl: global.rcanal,
+                mediaType: 1,
+                renderLargerThumbnail: true
+              }
+            }
+          })
+        } else if (anu.action === 'remove') {
+          let txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos de la cual preocuparse. ¡Ni regreses! 💅💢`
+          await conn.sendMessage(anu.id, {
+            text: txt,
+            contextInfo: {
+              mentionedJid: [num],
+              externalAdReply: {
+                title: `USUARIO SALIENTE 🦋`,
+                body: `Se fue de ${metadata.subject}`,
+                thumbnailUrl: ppuser,
+                sourceUrl: global.rcanal,
+                mediaType: 1,
+                renderLargerThumbnail: true
+              }
+            }
+          })
+        }
+      }
+    } catch (err) { log.error('Error en Welcome System: ' + err.message) }
+  })
+
+  // --- PROCESAMIENTO DE MENSAJES ---
+  conn.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return
+    let m = messages[0]
+    if (!m?.message || m.key.remoteJid === 'status@broadcast') return
+    try {
+      m = await smsg(conn, m)
+      await handler(m, conn, plugins)
+    } catch (e) { log.error(e.message) }
+  })
+}
+
+(async () => {
+  await database.read()
+  await loadPlugins()
+  global.plugins = plugins
+  await startBot()
+})()
