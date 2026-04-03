@@ -1,90 +1,82 @@
-import './settings.js'
 import chalk from 'chalk'
 
 export async function handler(m, conn, plugins) {
-    // Validaciones de seguridad básicas
-    if (!m || !m.chat) return
-    if (m.key.fromMe || m.isBaileys) return // Evita que Nino se responda a sí misma y cicle
+    if (!m || !m.chat || !m.text) return
+    if (m.key.fromMe || m.isBaileys) return
 
-    // Configuración de variables
-    const body = (typeof m.text === 'string' ? m.text : '')
-    const isCommand = body.startsWith(global.prefix)
-    const command = isCommand ? body.slice(global.prefix.length).trim().split(/\s+/).shift().toLowerCase() : ''
+    // Definimos el prefijo aquí (puedes cambiarlo)
+    const prefix = global.prefix || '#'
+    const body = m.text.trim()
 
-    // Si no es comando, cortamos ejecución aquí para no gastar recursos
-    if (!isCommand) return
+    if (!body.startsWith(prefix)) return
 
-    // Argumentos e Identidad
-    const args = body.trim().split(/\s+/).slice(1)
+    const command = body.slice(prefix.length).trim().split(/\s+/).shift().toLowerCase()
+    const args = body.slice(prefix.length).trim().split(/\s+/).slice(1)
     const text = args.join(' ')
-    const sender = m.sender || m.key.participant || m.key.remoteJid
-    const isOwner = global.owner.some(o => o[0] === sender.split('@')[0]) || (global.owners && global.owners.includes(sender.split('@')[0]))
+    const sender = m.sender
     const isGroup = m.chat.endsWith('@g.us')
 
-    // Búsqueda del Plugin
-    let plugin = null
-    for (let name in plugins) {
-        let p = plugins[name]
-        if (!p) continue
-        
-        // Maneja tanto si command es un array como si es un string
-        let cmdList = p.command || p.default?.command || []
-        if (Array.isArray(cmdList) ? cmdList.includes(command) : cmdList === command) {
-            plugin = p
+    // Logs para que veas en Termux qué está pasando
+    console.log(chalk.bgMagenta.white.bold(' CMD '), 
+                chalk.cyan(`\( {prefix} \){command}`), 
+                chalk.white('→'), 
+                chalk.yellow(m.pushName || sender.split('@')[0]))
+
+    // Buscar el plugin (compatible con Map que usamos en index.js)
+    let pluginFound = null
+    for (const [filename, plugin] of plugins.entries()) {
+        if (!plugin) continue
+
+        let cmdList = []
+        if (plugin.command) {
+            cmdList = Array.isArray(plugin.command) ? plugin.command : [plugin.command]
+        } else if (plugin.default?.command) {
+            cmdList = Array.isArray(plugin.default.command) ? plugin.default.command : [plugin.default.command]
+        } else {
+            // fallback por nombre de archivo
+            cmdList = [filename.replace('.js', '').toLowerCase()]
+        }
+
+        if (cmdList.some(cmd => cmd.toLowerCase() === command)) {
+            pluginFound = plugin
             break
         }
     }
 
-    if (!plugin) return // Si el comando no existe en los plugins, no hace nada
-
-    // 🚀 OPTIMIZACIÓN CRÍTICA (Anti-Lag y Anti-Ban)
-    let groupMetadata = null
-    let participants = []
-    let userAdmin = false
-    let isBotAdmin = false
-
-    if (isGroup) {
-        try {
-            // Solo pedimos la info del grupo UNA vez, no dos como en el código anterior
-            groupMetadata = await conn.groupMetadata(m.chat)
-            participants = groupMetadata.participants || []
-            
-            // Verificamos admins de forma segura
-            userAdmin = !!participants.find(p => p.id === sender)?.admin
-            const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net'
-            isBotAdmin = !!participants.find(p => p.id === botJid)?.admin
-        } catch (e) {
-            console.log(chalk.red(`[!] Error obteniendo metadatos del grupo: ${m.chat}`))
+    if (!pluginFound) {
+        // Fallback para comandos básicos aunque no haya plugin
+        if (command === 'ping') {
+            return await conn.sendMessage(m.chat, { text: `✅ *PONG!* 🦋\nBot activo y respondiendo.` })
         }
+        if (command === 'menu') {
+            return await conn.sendMessage(m.chat, { text: `🦋 *Nino Nakano Menu*\n\nComandos disponibles:\n\( {prefix}ping\n \){prefix}menu\n\nMás comandos en la carpeta plugins/` })
+        }
+        return // comando no encontrado
     }
 
-    // Logs en consola estilo Z0RT
-    console.log(chalk.bgAnsi256(201).white.bold(' CMD '), chalk.cyanBright(`${global.prefix}${command}`), chalk.white('de'), chalk.yellow(m.pushName || sender.split('@')[0]))
-
     try {
-        // Ejecutar el plugin de forma segura (soporta objetos y funciones)
-        const executePlugin = typeof plugin === 'function' ? plugin : (plugin.handler || plugin.default || plugin.execute)
-        
-        if (typeof executePlugin !== 'function') {
-            console.log(chalk.bgYellow.red.bold(' WARN '), chalk.yellow(`El plugin para '${command}' no tiene una función ejecutable válida.`))
+        // Ejecutar el plugin
+        const execute = typeof pluginFound === 'function' 
+            ? pluginFound 
+            : (pluginFound.handler || pluginFound.default || pluginFound.execute)
+
+        if (typeof execute !== 'function') {
+            console.log(chalk.yellow(`[WARN] Plugin ${command} no tiene función ejecutable`))
             return
         }
 
-        await executePlugin(conn, m, {
+        await execute(conn, m, {
             conn,
             command,
             args,
             text,
-            isOwner,
-            isGroup,
             sender,
-            groupMetadata,
-            participants,
-            userAdmin,
-            isBotAdmin
+            isGroup,
+            plugins
         })
-    } catch (e) {
-        console.error(chalk.bgRed.white.bold(' ERROR '), chalk.redBright(`Falló el comando ${command}:`), e)
-        m.reply(global.mess.error)
+
+    } catch (err) {
+        console.error(chalk.bgRed.white.bold(' ERROR '), chalk.red(`Comando ${command}:`), err)
+        await m.reply(`❌ Error ejecutando *\( {command}*\n \){err.message || err}`)
     }
 }
