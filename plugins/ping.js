@@ -1,45 +1,46 @@
 import os from 'os'
+import { performance } from 'perf_hooks'
 
 /**
- * Plugin para medir la velocidad de respuesta de Nino Nakano
+ * Plugin de Velocidad - Z0RT SYSTEMS
  */
-let handler = async (conn, m, { isOwner }) => {
-    const start = Date.now()
+let handler = async (m, { conn }) => {
+    // 1. Iniciamos el cronómetro de alta precisión
+    const start = performance.now()
 
-    // Enviamos el mensaje inicial
-    const { key } = await conn.sendMessage(m.chat, { 
-        text: 'Calculando mi velocidad... No te desesperes. 🦋' 
-    }, { quoted: m })
+    // 2. Mensaje inicial (Actitud Nino)
+    const { key } = await m.reply('Calculando mi velocidad... No me presiones, tonto. 🦋')
 
-    const end = Date.now()
-    const latencia = end - start
+    // 3. Cálculos de Hardware
+    const end = performance.now()
+    const latencia = (end - start).toFixed(2)
 
-    // --- ESTADÍSTICAS DE HARDWARE ---
-    // RAM usada por el bot (RSS es más preciso que heapUsed)
-    const ramUsada = (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
-    const ramTotal = Math.round(os.totalmem() / 1024 / 1024)
+    // RAM del proceso (RSS es la memoria real ocupada en el sistema)
+    const ramBot = (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
+    const ramTotal = (os.totalmem() / 1024 / 1024 / 1024).toFixed(1) // En GB para que se vea limpio
     
-    // Uptime calculado una sola vez
-    const totalUptime = process.uptime()
-    const uptimeH = Math.floor(totalUptime / 3600)
-    const uptimeM = Math.floor((totalUptime % 3600) / 60)
-    const uptimeS = Math.floor(totalUptime % 60)
+    // Info del Sistema
+    const nets = os.networkInterfaces()
+    const platform = os.platform() === 'android' ? 'Termux (Android)' : os.platform()
+    const cpuModelo = os.cpus()[0]?.model || 'Desconocido'
 
     const stats = `
 🦋 *NINO NAKANO SPEED* 🦋
+_¡Ugh! Mira lo rápido que soy, ¿impresionado?_
 
 ⚡ *Latencia:* \`${latencia} ms\`
-💻 *Host:* \`${os.hostname()}\`
-🧠 *RAM:* \`${ramUsada} MB / ${ramTotal} MB\`
-🛰️ *Uptime:* \`${uptimeH}h ${uptimeM}m ${uptimeS}s\`
+🛰️ *Servidor:* \`${platform}\`
+🧠 *CPU:* \`${cpuModelo.split(' @')[0]}\`
+💾 *Uso RAM:* \`${ramBot} MB / ${ramTotal} GB\`
 
-¡No parpadees, tonto! Soy mucho más rápida de lo que tus ojos pueden ver. 💅✨`.trim()
+> ꒰⌢ ʚ˚₊‧ ✎ ꒱ *STATUS:*
+Nino está corriendo perfectamente. No parpadees o te lo perderás. 💅✨`.trim()
 
-    // Editamos el mensaje con el resultado final
+    // 4. Editamos el mensaje con el resultado final
     await conn.sendMessage(m.chat, { text: stats, edit: key })
 }
 
-handler.command = ['ping', 'p', 'speed']
+handler.command = ['ping', 'p', 'speed', 'latencia']
 handler.owner = false 
 
 export default handler
