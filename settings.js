@@ -1,7 +1,6 @@
 import fs from 'fs'
 import chalk from 'chalk'
 import { fileURLToPath } from 'url'
-import path from 'path'
 
 // ————————————————————————————————————————————————————————————————————
 // CONFIGURACIÓN DE IDENTIDAD 🦋
@@ -54,11 +53,15 @@ global.mess = {
 // AUTO-RELOAD
 // ————————————————————————————————————————————————————————————————————
 
-const __filename = fileURLToPath(import.meta.url)
+const file = fileURLToPath(import.meta.url)
 
-fs.watchFile(__filename, async () => {
+fs.watchFile(file, async () => {
     try {
+        fs.unwatchFile(file) // Evita acumular procesos en memoria
         console.log(chalk.magentaBright('\n🦋 [SETTINGS]: Cambios guardados. Solo Aarom y Félix tienen el control ahora.'))
+        
+        // Importación dinámica con timestamp para evitar la caché de ESM y actualizar las variables reales
+        await import(`${file}?update=${Date.now()}`)
     } catch (e) {
         console.error(chalk.red('[!] Error en auto-reload:'), e)
     }
