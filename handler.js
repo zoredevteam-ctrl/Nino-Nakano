@@ -1,6 +1,6 @@
 import './settings.js';
 import chalk from 'chalk';
-import printLog from './lib/print.js'; // Ajustado al nombre del export que usamos antes
+import printLog from './lib/print.js';
 import { smsg } from './lib/simple.js';
 import { database } from './lib/database.js';
 import { readdirSync } from 'fs';
@@ -83,7 +83,7 @@ export const loadEvents = async (conn) => {
     try {
         files = readdirSync(eventsPath).filter(f => f.endsWith('.js'))
     } catch {
-        console.log(chalk.yellow('🦋 [EVENTS] Carpeta ./events no encontrada, omitiendo...'))
+        console.log(chalk.yellow('🦋 [EVENTS] Carpeta ./events no encontrada...'))
         return
     }
 
@@ -91,19 +91,17 @@ export const loadEvents = async (conn) => {
         try {
             const url = pathToFileURL(join(eventsPath, file)).href
             const mod = await import(url)
+            const eventMod = mod.default || mod
 
-            if (!mod.event || !mod.run) {
-                console.log(chalk.yellow(`🦋 [EVENTS] Saltando ${file}, falta event o run`))
-                continue
-            }
+            if (!eventMod.event || !eventMod.run) continue
 
-            conn.ev.on(mod.event, (data) => {
+            conn.ev.on(eventMod.event, (data) => {
                 const id = data?.id || data?.key?.remoteJid || null
-                if (mod.enabled && id && !mod.enabled(id)) return
-                mod.run(conn, data)
+                if (eventMod.enabled && id && !eventMod.enabled(id)) return
+                eventMod.run(conn, data)
             })
 
-            console.log(chalk.magentaBright(`🎀 [EVENTS] ✦ ${file} → ${mod.event}`))
+            console.log(chalk.magentaBright(`🎀 [EVENTS] ✦ ${file} → ${eventMod.event}`))
         } catch (e) {
             console.log(chalk.red(`[EVENTS ERROR] ${file}:`), e.message)
         }
@@ -113,10 +111,7 @@ export const loadEvents = async (conn) => {
 export const handler = async (m, conn, plugins) => {
     try {
         if (!m) return;
-
         await loadEvents(conn)
-
-        // Usamos el simple.js optimizado
         m = await smsg(conn, m);
 
         if (m.isGroup) {
@@ -127,12 +122,9 @@ export const handler = async (m, conn, plugins) => {
             }
         }
 
-        // Si no hay mensaje de texto (ej. solo stickers sin caption), salir.
         if (!m.body) return;
-
         const prefix = getPrefix(m.body)
-        
-        // Log con estilo Nino Nakano
+
         if (m.body && !m.fromMe) {
             printLog(!!prefix, m.sender, m.isGroup ? m.chat : null, m.body, m.pushName)
         }
@@ -146,38 +138,28 @@ export const handler = async (m, conn, plugins) => {
         if (!commandName) return;
 
         let cmd = null
+        let pluginKey = null
 
-        if (prefix === '$') {
-            for (const [, plugin] of plugins) {
-                if (plugin.customPrefix?.includes('$')) {
-                    cmd = plugin
-                    args.unshift(commandName)
-                    break
-                }
-            }
-        } else {
-            for (const [, plugin] of plugins) {
-                if (!plugin.command) continue
-                const cmds = Array.isArray(plugin.command)
-                    ? plugin.command
-                    : plugin.command instanceof RegExp
-                        ? []
-                        : [plugin.command]
-                if (cmds.map(c => c.toLowerCase()).includes(commandName)) {
-                    cmd = plugin
-                    break
-                }
+        // Buscador de comandos mejorado
+        for (const [key, plugin] of Object.entries(plugins)) {
+            const p = plugin.default || plugin
+            if (!p.command) continue
+            
+            const cmds = Array.isArray(p.command) ? p.command : [p.command]
+            if (cmds.some(c => (typeof c === 'string' && c.toLowerCase() === commandName) || (c instanceof RegExp && c.test(commandName)))) {
+                cmd = p
+                pluginKey = key
+                break
             }
         }
 
         if (!cmd) {
             const allCommands = []
-            for (const [, plugin] of plugins) {
-                if (!plugin.command) continue
-                const cmds = Array.isArray(plugin.command) ? plugin.command : [plugin.command]
-                for (const c of cmds) {
-                    if (typeof c === 'string') allCommands.push(c)
-                }
+            for (const [, plugin] of Object.entries(plugins)) {
+                const p = plugin.default || plugin
+                if (!p.command) continue
+                const cmds = Array.isArray(p.command) ? p.command : [p.command]
+                for (const c of cmds) if (typeof c === 'string') allCommands.push(c)
             }
 
             const similares = allCommands
@@ -188,18 +170,11 @@ export const handler = async (m, conn, plugins) => {
 
             const sugerencias = similares.length
                 ? similares.map(s => `> ✧ \`${prefix + s.cmd}\` » *${s.score}%*`).join('\n')
-                : '> _Ninguno, estás escribiendo cualquier cosa._'
+                : '> _No pude encontrar nada parecido... 🥺_'
 
             return conn.sendMessage(m.chat, {
-                text: `¿Huh? El comando *(${prefix + commandName})* no existe. ¿Acaso no sabes escribir? 🙄\n- Usa *${prefix}menu* y no me hagas perder el tiempo.\n\n*¿Tal vez quisiste decir esto?:*\n${sugerencias}`
+                text: `¡Oh! Lo siento mucho, pero no encuentro el comando *(${prefix + commandName})*. 🥺 ¿Tal vez quisiste decir algo de esto?\n\n${sugerencias}\n\nSi no, puedes ver todo lo que puedo hacer con *${prefix}menu* 🌸`
             }, { quoted: m })
-        }
-
-        const senderRawFull = m.sender || ''
-        const senderCanonical = senderRawFull.replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
-        if (senderCanonical !== m.sender) {
-            m.realSender = m.sender
-            m.sender = senderCanonical
         }
 
         const isROwner = isRootOwnerJid(m.sender)
@@ -207,198 +182,84 @@ export const handler = async (m, conn, plugins) => {
         const isPremium = isOwner || isPremiumJid(m.sender)
         const isRegistered = isOwner || database.data.users?.[m.sender]?.registered || false
 
-        const isGroup = m.isGroup;
         let isAdmin = false;
         let isBotAdmin = false;
 
-        if (isGroup) {
+        if (m.isGroup) {
             try {
                 const groupMeta = await conn.groupMetadata(m.chat);
-                const participant = groupMeta.participants.find(p =>
-                    p.jid === m.sender || p.id === m.sender
-                )
-                isAdmin = !!participant?.admin || isOwner
-
-                const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net'
-                const botParticipant = groupMeta.participants.find(p =>
-                    p.jid === botJid || p.id === botJid
-                )
-                isBotAdmin = !!botParticipant?.admin
+                isAdmin = groupMeta.participants.find(p => p.id === m.sender)?.admin || isOwner
+                isBotAdmin = !!groupMeta.participants.find(p => p.id === (conn.user.id.split(':')[0] + '@s.whatsapp.net'))?.admin
             } catch (err) {
                 console.log(chalk.red('[ERROR GROUP META]'), err.message);
             }
         }
 
-        // 🟢 INICIALIZACIÓN SEGURA DE BASE DE DATOS 🟢
-        if (!database.data.users) database.data.users = {};
-        if (!database.data.groups) database.data.groups = {};
-
+        // Inicialización de DB
         if (!database.data.users[m.sender]) {
             database.data.users[m.sender] = {
-                registered: false,
-                premium: false,
-                banned: false,
-                warning: 0,
-                exp: 0,
-                level: 1,
-                limit: 20,
-                lastclaim: 0,
-                registered_time: 0,
-                name: m.pushName || '',
-                age: null
-            };
-            // No usamos await save() aquí si tienes el auto-save del database.js
-        }
-
-        if (isGroup && !database.data.groups[m.chat]) {
-            database.data.groups[m.chat] = {
-                modoadmin: false,
-                muted: []
+                registered: false, premium: false, banned: false, warning: 0,
+                exp: 0, level: 1, limit: 20, lastclaim: 0, name: m.pushName || '', age: null
             };
         }
-
-        // Resolución who con soporte LID → JID real
-        let who = null;
-
-        if (m.mentionedJid && m.mentionedJid[0]) {
-            who = m.mentionedJid[0];
-        } else if (m.quoted?.sender) {
-            who = m.quoted.sender;
+        if (m.isGroup && !database.data.groups[m.chat]) {
+            database.data.groups[m.chat] = { modoadmin: false, muted: [] };
         }
 
-        if (who) {
-            const rawNum = who.split('@')[0].split(':')[0]
-            const isLid = who.endsWith('@lid') || rawNum.length > 13
+        // 🛑 VALIDACIONES TIERNAS 🛑
 
-            if (isLid && m.isGroup) {
-                try {
-                    const groupMeta = await conn.groupMetadata(m.chat)
-                    const found = groupMeta.participants.find(p =>
-                        p.id?.split('@')[0] === rawNum
-                    )
-                    if (found?.jid && found.jid.endsWith('@s.whatsapp.net')) {
-                        who = found.jid.includes(':') ? found.jid.split(':')[0] + '@s.whatsapp.net' : found.jid
-                    } else if (found?.id && found.id.endsWith('@s.whatsapp.net')) {
-                        who = found.id
-                    } else {
-                        who = rawNum + '@lid'
-                    }
-                } catch {
-                    who = rawNum + '@lid'
-                }
-            } else {
-                who = rawNum + '@s.whatsapp.net'
-            }
-        }
-
-        // 🛑 VALIDACIONES CON PERSONALIDAD TSUNDERE 🛑
-        
-        if (isGroup && database.data.groups[m.chat]?.modoadmin && !isAdmin && !isOwner) {
-            return m.reply('⚙️ *𝖅0𝕽𝕿 𝕾𝖄𝕾𝕿𝕰𝕸𝕾*\n\n🔒 *MODO ADMIN ACTIVO*\n_Ni lo intentes. Solo los administradores pueden darme órdenes aquí. 💅_');
+        if (m.isGroup && database.data.groups[m.chat]?.modoadmin && !isAdmin) {
+            return m.reply('🌸 *AVISO LINDO*\n\nLo siento mucho, pero el modo administrador está activo y solo ellos pueden darme órdenes ahora. 🥺✨');
         }
 
         if (database.data.users[m.sender]?.banned && !isOwner) {
-            return m.reply('🚫 *BANEADO*\n_¿De verdad creíste que te dejaría usar mis comandos después de lo que hiciste? Estás baneado. Aléjate. 💢_');
+            return m.reply('🚫 *AVISO*\n\nLo siento, pero no tengo permitido hablar contigo porque estás en la listita de baneados... 😔🌸');
         }
 
         if (cmd.rowner && !isROwner) {
-            return m.reply('👑 *SOLO PARA AAROM*\n_¿Y tú quién te crees? Este código es solo para mi creador principal. 😤_');
+            return m.reply('👑 *EXCLUSIVO*\n\n¡Perdón! 🥺 Este comando es súper especial y solo Aarom puede usarlo. ✨');
         }
 
         if (cmd.owner && !isOwner) {
-            return m.reply('👑 *ACCESO RESTRINGIDO*\n_Solo mis verdaderos dueños pueden tocar esto. 💅_');
+            return m.reply('👑 *SOLO DUEÑOS*\n\nSolo Aarom y Félix pueden usar esto... ¡No te sientas mal, por favor! 💕');
         }
 
         if (cmd.premium && !isPremium) {
-            return m.reply('💎 *SOLO PREMIUM*\n_Ugh, qué pobre. Necesitas ser Premium para pedirme esto. 🙄_');
+            return m.reply('💎 *PREMIUM*\n\nEsta función es para mis usuarios Premium. 🌸 ¿Te gustaría ser uno de ellos? ✨');
         }
 
         if (cmd.register && !isRegistered) {
-            return m.reply(`📝 *NO ESTÁS REGISTRADO*\n_No hablo con extraños. Regístrate primero si quieres mi atención._\n\n> Usa: *${prefix}reg nombre.edad*\n> Ejemplo: *${prefix}reg tonto.18* 🦋`);
+            return m.reply(`📝 *REGISTRO*\n\n¡Hola! 🥰 Todavía no nos conocemos bien. ¿Podrías registrarte para que pueda recordarte?\n\n> Usa: *${prefix}reg nombre.edad* 🦋`);
         }
 
-        if (cmd.group && !isGroup) {
-            return m.reply('🏢 *SOLO GRUPOS*\n_¿Intentas hacer esto en privado? Qué raro eres... Esto solo funciona en grupos. 🙄_');
+        if (cmd.group && !m.isGroup) {
+            return m.reply('🏢 *GRUPOS*\n\n¡Ay! 🌸 Este comando solo puedo hacerlo si estamos en un grupito. ¿Vamos a uno? 🥺');
         }
 
         if (cmd.admin && !isAdmin) {
-            return m.reply('👮 *SOLO ADMINS*\n_No recibo órdenes de un usuario común como tú. Consigue admin y luego hablamos. 💅_');
+            return m.reply('👮 *ADMINS*\n\nSolo los administradores del grupo pueden pedirme esto. ¡Espero que lo entiendas! 🥰🌸');
         }
 
         if (cmd.botAdmin && !isBotAdmin) {
-            return m.reply('🤖 *NECESITO ADMIN*\n_¿Quieres que haga el trabajo pero no me das administrador? Qué inútil. Dame admin primero. 😒_');
-        }
-
-        if (cmd.private && isGroup) {
-            return m.reply('💬 *SOLO PRIVADO*\n_Esto es demasiado vergonzoso para el grupo... Escríbeme al privado si quieres usar esto. 😳_');
+            return m.reply('🤖 *NECESITO ADMIN*\n\nPara poder ayudarte con esto, necesito que me des permisos de administradora primero, ¿sí? 🥺💕');
         }
 
         if (cmd.limit && !isPremium && !isOwner) {
-            const userLimit = database.data.users[m.sender].limit || 0;
-            if (userLimit < 1) {
-                return m.reply(`⚠️ *LÍMITES AGOTADOS*\n_Se te acabaron los diamantes, tonto. Consigue más o vuélvete Premium si quieres seguir molestándome. 💢_`);
+            if (database.data.users[m.sender].limit < 1) {
+                return m.reply(`⚠️ *SIN DIAMANTES*\n\n¡Oh no! Se te acabaron tus diamantes. 🥺 Pero no te preocupes, mañana te daré más o puedes pedirle a Aarom que te ayude. ✨`);
             }
             database.data.users[m.sender].limit -= 1;
-            // No es necesario database.save() si tu interval auto-guarda
         }
 
-        // EJECUCIÓN DEL COMANDO
+        // EJECUCIÓN
         try {
-            await cmd(m, {
-                conn,
-                args,
-                isOwner,
-                isROwner,
-                isPremium,
-                isRegistered,
-                isAdmin,
-                isBotAdmin,
-                isGroup,
-                who,
-                db: database.data,
-                prefix,
-                plugins
-            })
-
+            await cmd(m, { conn, args, isOwner, isROwner, isPremium, isAdmin, isBotAdmin, isGroup: m.isGroup, prefix, plugins })
         } catch (e) {
-            // MANEJO DE ERRORES EXTREMO DE Z0RT SYSTEMS
             console.log(chalk.red('\n[!] ERROR EN PLUGIN:'), e)
-
-            const name = e?.name || 'Error'
-            const message = e?.message || String(e)
-            const stackLines = e?.stack?.split('\n') || []
-            let file = null
-            let line = null
-
-            for (const l of stackLines) {
-                const match = l.match(/\((.*plugins.*):(\d+):(\d+)\)/)
-                if (match) {
-                    file = match[1]
-                    line = match[2]
-                    break
-                }
-            }
-
-            let debug = `
-💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢
-
-_Algo salió mal en el código. Mira el desastre que causaste... Le enviaré el reporte a mis dueños._
-
-📌 *Comando:* ${prefix + commandName}
-📂 *Archivo:* ${file ? file.split('/').pop() : 'desconocido'} (Línea: ${line || '?'})
-📛 *Error:* ${name}
-
-🧾 *Detalle:*
-${message.slice(0,300)}
-`.trim()
-
-            if (m?.reply) m.reply(debug)
+            m.reply(`🌸 *¡AY! ALGO SALIÓ MAL...*\n\nPerdóname, hubo un errorcito al procesar el comando. 🥺 Aarom ya debe estar avisado para arreglarlo. 🥰\n\n\`\`\`${e.message}\`\`\``)
         }
 
     } catch (e) {
         console.log(chalk.red('[ERROR HANDLER GLOBAL]'), e)
-        if (m?.reply) {
-            m.reply(`❌ *COLAPSO GLOBAL*\n_Ugh, el núcleo del bot acaba de fallar por algo grave._\n\n🧾 ${String(e).slice(0,300)}`)
-        }
     }
 }
