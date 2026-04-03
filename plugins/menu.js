@@ -1,20 +1,22 @@
 import { database } from '../lib/database.js'
 
 /**
- * Menú Principal - Z0RT SYSTEMS
+ * Menú Principal - Versión Amable 🌸
+ * Corregido por Aarom
  */
-let handler = async (m, { conn, usedPrefix: prefix }) => {
+let handler = async (m, { conn, usedPrefix }) => {
     try {
-        // 1. Corrección de variables y seguridad
+        // 1. Definición segura de variables para evitar 'undefined'
         const sender = m.sender
-        // Intentamos obtener el nombre de varias fuentes para evitar el error de undefined
-        const username = m.pushName || conn.getName(sender) || 'Usuario'
+        const prefix = usedPrefix || '#' // Si usedPrefix falla, usa # por defecto
+        const username = m.pushName || 'Tesoro' // Si no hay nombre, te dice Tesoro
+        const nombreBot = global.botName || 'Nino Nakano'
 
-        // 2. Ping Real con validación de timestamp
+        // 2. Ping / Latencia
         const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
         const p = `${Math.abs(Date.now() - timestamp)}ms`
 
-        // 3. Cálculo de Uptime
+        // 3. Uptime (Tiempo activo)
         const uptimeSeconds = process.uptime()
         const d = Math.floor(uptimeSeconds / (3600 * 24))
         const h = Math.floor((uptimeSeconds % (3600 * 24)) / 3600)
@@ -22,13 +24,11 @@ let handler = async (m, { conn, usedPrefix: prefix }) => {
         const s = Math.floor(uptimeSeconds % 60)
         const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-        // 4. Lectura Segura de la Base de Datos
-        const dbData = database.data || {}
-        const users = dbData.users || {}
+        // 4. Base de Datos
+        const users = database.data?.users || {}
+        const user = users[sender] || { limit: 0, xp: 0, level: 1 }
         const totalreg = Object.keys(users).length
-        const user = users[sender] || {}
 
-        const nombreBot = global.botName || 'Nino Nakano'
         const userMoney = user.limit ?? 0
         const userExp = user.xp ?? 0
         const userLevel = user.level ?? 1
@@ -43,39 +43,39 @@ let handler = async (m, { conn, usedPrefix: prefix }) => {
         }
         const rango = getRango(userLevel)
 
-        // Cálculo de Ranking Top de forma segura
+        // Ranking
         const sortedExp = Object.entries(users).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
         const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1
-        const rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : `Sin clasificar`
+        const rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : `---`
 
-        // 5. El Menú con personalidad Tsundere
-        let txt = `¿Ugh? ¿Otra vez molestando? 🙄
-Soy *${nombreBot}*, no un juguete. Lee bien antes de hacer que rompa algo, ${username}.
+        // 5. Diseño del Menú (Personalidad Tierna)
+        let txt = `¡Hola, *${username}*! ✨ 
+Es un gusto verte de nuevo. Soy *${nombreBot}* y estoy aquí para ayudarte en lo que necesites. ¡Espero que tengamos un lindo día! 🌸🦋
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
-- ${nombreBot} es un sistema privado protegido bajo la red de *𝓐𝓪𝓻𝓸𝓶*.
+- Este es un sistema privado creado con mucho cariño por *𝓐𝓪𝓻𝓸𝓶*.
 
-*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 SISTEMA 𐦯*
-*|✎ Creators:* 𝓐𝓪𝓻𝓸𝓶
+*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 ESTADÍSTICAS 𐦯*
+*|✎ Creador:* 𝓐𝓪𝓻𝓸𝓶
 *|✎ Usuarios:* ${totalreg.toLocaleString()}
-*|✎ Uptime:* ${uptime}
-*|✎ Ping:* ${p}
-*|✎ Canal:* ${global.rcanal || 'No disponible'}
+*|✎ Activo:* ${uptime}
+*|✎ Latencia:* ${p}
+*|✎ Canal:* ${global.rcanal || 'Canal de Aarom'}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🦋◌⃘⃪۪𐇽֟፝۫۬🦋◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*╭╼𝅄꒰✧: ꒱ 𐔌 PERFIL DE USUARIO 𐦯*
-*|✎ Humano:* ${username}
+*╭╼𝅄꒰✧: ꒱ 𐔌 TU PERFIL 𐦯*
+*|✎ Nombre:* ${username}
 *|✎ Diamantes:* ${userMoney} 💎
-*|✎ Exp:* ${userExp} ✨
+*|✎ Experiencia:* ${userExp} ✨
 *|✎ Rango:* ${rango}
 *|✎ Nivel:* ${userLevel}
-*|✎ Top:* ${rankText}
+*|✎ Ranking:* ${rankText}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦*
-_No te equivoques al escribirlos, no tengo paciencia hoy. 💢_
+*➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗙𝗨𝗡𝗖𝗜𝗢𝗡𝗘𝗦*
+_Aquí tienes todo lo que puedo hacer por ti:_
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 BÁSICOS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SISTEMA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}ping*
 > *✧･ﾟ: ❏ ${prefix}update*
 > *✧･ﾟ: ❏ ${prefix}owner*
@@ -89,8 +89,8 @@ _No te equivoques al escribirlos, no tengo paciencia hoy. 💢_
             text: txt,
             contextInfo: {
                 externalAdReply: {
-                    title: `🦋 ${nombreBot.toUpperCase()} 🦋`,
-                    body: 'Panel de Control Principal',
+                    title: `🌸 ${nombreBot.toUpperCase()} 🌸`,
+                    body: 'Panel de Control de Aarom',
                     thumbnailUrl: global.banner,
                     sourceUrl: global.rcanal,
                     mediaType: 1,
@@ -102,8 +102,7 @@ _No te equivoques al escribirlos, no tengo paciencia hoy. 💢_
 
     } catch (e) {
         console.error(e)
-        // Respuesta en caso de que algo falle internamente
-        m.reply(`💢 *¡ERROR CRÍTICO!* 💢\n\nAlgo salió mal al generar el menú. Revisa la consola.`)
+        m.reply(`🌸 *Ups...* \nHubo un pequeño problema al mostrar el menú. ¡Pero no te preocupes, Aarom lo solucionará pronto!`)
     }
 }
 
