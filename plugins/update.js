@@ -6,21 +6,21 @@ import chalk from 'chalk'
  * @param {import('../lib/simple').smsg} m 
  */
 let handler = async (m, { conn, isOwner }) => {
-    // 1. Doble seguridad de Owner (Aunque el handler ya lo hace)
-    if (!isOwner) return m.reply('¿Qué crees que estás haciendo? 🙄 Solo mi creador puede tocar mis archivos internos. ¡Aléjate! 💅💢')
+    // 1. Doble seguridad de Owner
+    if (!isOwner) return m.reply('¡Lo siento mucho! 🥺 Pero mi creador Aarom me dijo que solo él puede usar esto. ¡No te enojes conmigo, por favor! 💕')
 
-    await m.reply('Ugh, está bien... Revisaré si hay algo nuevo en el repositorio. No me hagas esperar mucho. 🦋')
+    await m.reply('¡Claro que sí! 😼 Dame un segundito, voy a revisar con cuidado si hay alguna actualización nueva. 🦋✨')
 
     // 2. Ejecutamos el comando Git
     exec('git pull', async (err, stdout, stderr) => {
         if (err) {
             console.error(chalk.red('[ERROR UPDATE]:'), err)
-            return m.reply(`❌ *¡UGH! ALGO SALIÓ MAL...* \n\n_Seguro Aarom rompió algo en el código. Arréglalo tonto:_\n\`\`\`${err.message}\`\`\``)
+            return m.reply(`❌ *¡AY NO! ALGO SALIÓ MAL...* 😭 \n\n_Perdóname, parece que hay un pequeño error. ¿Me ayudas a revisarlo, por favor?:_\n\`\`\`${err.message}\`\`\``)
         }
 
         // 3. Caso: Ya está actualizado
         if (stdout.includes('Already up to date')) {
-            return m.reply('No hay nada nuevo, tonto. Ya estoy en mi mejor versión. 🙄✨')
+            return m.reply('¡Ya estoy al día! 🌸 No hay archivos nuevos, sigo estando en mi mejor versión para ti. 🥰✨')
         }
 
         // 4. Caso: Hay cambios nuevos
@@ -30,7 +30,7 @@ let handler = async (m, { conn, isOwner }) => {
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ *CAMBIOS:*
 \`\`\`${stdout}\`\`\`
 
-Reiniciando el sistema para aplicar las mejoras de *Z0RT SYSTEMS*... No te vayas, volveré enseguida. 💅✨`.trim()
+Voy a reiniciarme rapidito para aplicar todas las cositas lindas que creó Aarom para mí... ¡No me tardo nada, espérame! 💕🌸`.trim()
 
             await conn.sendMessage(m.chat, { 
                 text: updateMsg,
@@ -48,7 +48,6 @@ Reiniciando el sistema para aplicar las mejoras de *Z0RT SYSTEMS*... No te vayas
             }, { quoted: m })
 
             // 5. Reinicio Automático
-            // Esto solo funciona si usas un script 'sh start.sh' o 'pm2'
             console.log(chalk.magentaBright('\n[!] Reiniciando bot por actualización...\n'))
             setTimeout(() => {
                 process.exit(0)
@@ -56,12 +55,12 @@ Reiniciando el sistema para aplicar las mejoras de *Z0RT SYSTEMS*... No te vayas
 
         } else {
             // 6. Respuestas inesperadas
-            return m.reply(`⚠️ *RESPUESTA INESPERADA:* \n\n${stdout || stderr}`)
+            return m.reply(`⚠️ *Tengo una respuesta inesperada:* 🥺\n\n${stdout || stderr}`)
         }
     })
 }
 
 handler.command = ['update', 'actualizar', 'gitpull', 'fix']
-handler.owner = true // Solo los owners registrados en settings.js
+handler.owner = true 
 
 export default handler
