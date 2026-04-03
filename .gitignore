@@ -1,33 +1,51 @@
-# Dependencias
+# ——————————————————————————————————————————————————
+# DEPENDENCIAS
+# ——————————————————————————————————————————————————
 node_modules/
 package-lock.json
 yarn.lock
 
-# Sesiones y Privacidad (¡CRÍTICO!)
+# ——————————————————————————————————————————————————
+# SESIONES (¡PROHIBIDO SUBIR!) 🚫
+# ——————————————————————————————————————————————————
 Sessions/
 session_nino/
 auth_info_baileys/
 creds.json
+*.json
+!package.json
+!database.json.example
+
+# Bloqueo específico para Baileys Store
 *.store.json
 baileys_store.json
+baileys_multi_device.json
 
-# Base de Datos Local
+# ——————————————————————————————————————————————————
+# DATOS Y TEMPORALES 💾
+# ——————————————————————————————————————————————————
 database.json
+database.json.tmp
 store.json
+temp/
+tmp/
+*.tmp
 
-# Archivos de Sistema y Logs
+# ——————————————————————————————————————————————————
+# SISTEMA Y LOGS 🛠️
+# ——————————————————————————————————————————————————
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .env
 .cache
-
-# Archivos Basura (OS)
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Temporales
-temp/
-tmp/
+# ——————————————————————————————————————————————————
+# ARCHIVOS DE DESARROLLO PERSONAL
+# ——————————————————————————————————————————————————
+test.js
+debug.js
