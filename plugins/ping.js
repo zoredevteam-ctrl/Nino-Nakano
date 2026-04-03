@@ -1,25 +1,29 @@
 import os from 'os'
 
 /**
- * Plugin para medir la velocidad de respuesta del bot
+ * Plugin para medir la velocidad de respuesta de Nino Nakano
  */
-let handler = async (conn, m, { conn: nino }) => {
+let handler = async (conn, m, { isOwner }) => {
     const start = Date.now()
-    
-    // Enviamos el mensaje inicial usando el sistema de smsg
+
+    // Enviamos el mensaje inicial
     const { key } = await conn.sendMessage(m.chat, { 
         text: 'Calculando mi velocidad... No te desesperes. 🦋' 
     }, { quoted: m })
-    
+
     const end = Date.now()
     const latencia = end - start
 
-    // Estadísticas de hardware
-    const ramUsada = (process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)
+    // --- ESTADÍSTICAS DE HARDWARE ---
+    // RAM usada por el bot (RSS es más preciso que heapUsed)
+    const ramUsada = (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
     const ramTotal = Math.round(os.totalmem() / 1024 / 1024)
-    const uptimeH = Math.floor(process.uptime() / 3600)
-    const uptimeM = Math.floor((process.uptime() % 3600) / 60)
-    const uptimeS = Math.floor(process.uptime() % 60)
+    
+    // Uptime calculado una sola vez
+    const totalUptime = process.uptime()
+    const uptimeH = Math.floor(totalUptime / 3600)
+    const uptimeM = Math.floor((totalUptime % 3600) / 60)
+    const uptimeS = Math.floor(totalUptime % 60)
 
     const stats = `
 🦋 *NINO NAKANO SPEED* 🦋
@@ -31,12 +35,11 @@ let handler = async (conn, m, { conn: nino }) => {
 
 ¡No parpadees, tonto! Soy mucho más rápida de lo que tus ojos pueden ver. 💅✨`.trim()
 
-    // Editamos el mensaje enviado anteriormente con los resultados
+    // Editamos el mensaje con el resultado final
     await conn.sendMessage(m.chat, { text: stats, edit: key })
 }
 
-// --- CONFIGURACIÓN ---
-handler.command = ['ping', 'p', 'speed'] // Comandos que activan el plugin
-handler.owner = false // Cualquiera puede ver qué tan rápida soy 🙄
+handler.command = ['ping', 'p', 'speed']
+handler.owner = false 
 
 export default handler
