@@ -1,13 +1,17 @@
-import os from 'os'
-import db from '../lib/database.js'
+import { database } from '../lib/database.js' // Importación correcta del DB
 
-let handler = async (conn, m, { pushname, sender }) => {
-    // --- PING REAL ---
-    // Calculamos la diferencia entre ahora y cuando el mensaje fue enviado
-    const timestamp = Date.now()
+/**
+ * Menú Principal - Z0RT SYSTEMS
+ */
+let handler = async (m, { conn, prefix }) => {
+    // 1. Corrección de variables: m.pushName viene del simple.js
+    const sender = m.sender
+    const username = m.pushName || 'Tonto'
+
+    // 2. Ping Real
     const p = `${Math.abs(Date.now() - (m.messageTimestamp * 1000))}ms`
 
-    // --- CÁLCULO DE UPTIME ---
+    // 3. Cálculo de Uptime
     const uptimeSeconds = process.uptime()
     const d = Math.floor(uptimeSeconds / (3600 * 24))
     const h = Math.floor((uptimeSeconds % (3600 * 24)) / 3600)
@@ -15,21 +19,15 @@ let handler = async (conn, m, { pushname, sender }) => {
     const s = Math.floor(uptimeSeconds % 60)
     const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-    // --- LÓGICA DE BASE DE DATOS (SEGURA) ---
-    if (!db.data) await db.read() // Forzar lectura si no ha cargado
-    if (!db.data.users) db.data.users = {}
+    // 4. Lectura Segura de la Base de Datos
+    const dbData = database.data
+    const totalreg = Object.keys(dbData.users || {}).length
+    const user = dbData.users?.[sender] || {}
 
-    if (!db.data.users[sender]) {
-        db.data.users[sender] = { limit: 10, xp: 0, level: 1 }
-    }
-
-    const totalreg = Object.keys(db.data.users).length
-    const user = db.data.users[sender]
-    const nombreBot = global.botName || 'Nino Bot'
-    const username = pushname || 'Usuario'
-    const userMoney = user?.limit ?? 0
-    const userExp = user?.xp ?? 0
-    const userLevel = user?.level ?? 1
+    const nombreBot = global.botName || 'Nino Nakano'
+    const userMoney = user.limit ?? 0
+    const userExp = user.xp ?? 0
+    const userLevel = user.level ?? 1
 
     // Sistema de Rangos
     const getRango = (level) => {
@@ -41,45 +39,47 @@ let handler = async (conn, m, { pushname, sender }) => {
     }
     const rango = getRango(userLevel)
 
-    // Cálculo de Ranking (Top Exp)
-    const sortedExp = Object.entries(db.data.users).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
+    // Cálculo de Ranking Top
+    const sortedExp = Object.entries(dbData.users || {}).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
     const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1
     const rankText = `${rankIndex} / ${totalreg}`
 
-    let txt = `¡𝐇𝐨𝐥𝐚! Soy *${nombreBot}* 🦋
+    // 5. El Menú con personalidad Tsundere y jerarquía oficial
+    let txt = `¿Ugh? ¿Otra vez molestando? 🙄
+Soy *${nombreBot}*, no un juguete. Lee bien antes de hacer que rompa algo, ${username}.
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
-- ${nombreBot} es un bot privado bajo la gestión de *Z0RT SYSTEMS*. Usa el menú para explorar mis funciones.
+- ${nombreBot} es un sistema privado protegido bajo la red de *𝓐𝓪𝓻𝓸𝓶*.
 
-*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 BOT - INFO 𐦯*
-*|✎ Creador:* 𝓐𝓪𝓻𝓸𝓶
-*|✎ Users:* ${totalreg.toLocaleString()}
+*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 SISTEMA 𐦯*
+*|✎ Creators:* 𝓐𝓪𝓻𝓸𝓶
+*|✎ Usuarios:* ${totalreg.toLocaleString()}
 *|✎ Uptime:* ${uptime}
 *|✎ Ping:* ${p}
-*|✎ Baileys:* Multi-Device
 *|✎ Canal:* ${global.rcanal}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🦋◌⃘⃪۪𐇽֟፝۫۬🦋◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*╭╼𝅄꒰✧: ꒱ 𐔌 INFO - USER 𐦯*
-*|✎ Nombre:* ${username}
-*|✎ Diamantes:* ${userMoney}
-*|✎ Exp:* ${userExp}
+*╭╼𝅄꒰✧: ꒱ 𐔌 PERFIL DE USUARIO 𐦯*
+*|✎ Humano:* ${username}
+*|✎ Diamantes:* ${userMoney} 💎
+*|✎ Exp:* ${userExp} ✨
 *|✎ Rango:* ${rango}
 *|✎ Nivel:* ${userLevel}
 *|✎ Top:* ${rankText}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗖𝗢𝗠𝗔𝗡𝗗𝗢𝗦*
+_No te equivoques al escribirlos, no tengo paciencia hoy. 💢_
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SISTEMA 𐦯*
-> *✧･ﾟ: ❏ #p / #ping*
-> *✧･ﾟ: ❏ #update*
-> *✧･ﾟ: ❏ #owner*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 BÁSICOS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}ping*
+> *✧･ﾟ: ❏ ${prefix}update*
+> *✧･ﾟ: ❏ ${prefix}owner*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 GRUPOS 𐦯*
-> *✧･ﾟ: ❏ #kick*
-> *✧･ﾟ: ❏ #ban*
-> *✧･ﾟ: ❏ #promover / #degradar*`
+> *✧･ﾟ: ❏ ${prefix}kick*
+> *✧･ﾟ: ❏ ${prefix}ban*
+> *✧･ﾟ: ❏ ${prefix}promover / ${prefix}degradar*`.trim()
 
     await conn.sendMessage(m.chat, { 
         text: txt,
@@ -90,7 +90,7 @@ let handler = async (conn, m, { pushname, sender }) => {
                 thumbnailUrl: global.banner,
                 sourceUrl: global.rcanal,
                 mediaType: 1,
-                showAdAttribution: true, // Esto le da un toque más oficial
+                showAdAttribution: true,
                 renderLargerThumbnail: true
             }
         }
