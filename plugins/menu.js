@@ -1,10 +1,11 @@
 import os from 'os'
-import db from '../lib/database.js' // Importamos la db correctamente
+import db from '../lib/database.js'
 
 let handler = async (conn, m, { pushname, sender }) => {
-    const start = Date.now()
-    // Pequeño truco para el ping visual
-    const p = `${Date.now() - start}ms`
+    // --- PING REAL ---
+    // Calculamos la diferencia entre ahora y cuando el mensaje fue enviado
+    const timestamp = Date.now()
+    const p = `${Math.abs(Date.now() - (m.messageTimestamp * 1000))}ms`
 
     // --- CÁLCULO DE UPTIME ---
     const uptimeSeconds = process.uptime()
@@ -14,13 +15,15 @@ let handler = async (conn, m, { pushname, sender }) => {
     const s = Math.floor(uptimeSeconds % 60)
     const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-    // --- LÓGICA DE BASE DE DATOS ---
-    // Inicializar usuario si no existe (Silencioso)
+    // --- LÓGICA DE BASE DE DATOS (SEGURA) ---
+    if (!db.data) await db.read() // Forzar lectura si no ha cargado
+    if (!db.data.users) db.data.users = {}
+    
     if (!db.data.users[sender]) {
         db.data.users[sender] = { limit: 10, xp: 0, level: 1 }
     }
 
-    const totalreg = Object.keys(db.data.users || {}).length
+    const totalreg = Object.keys(db.data.users).length
     const user = db.data.users[sender]
     const nombreBot = global.botName || 'Nino Bot'
     const username = pushname || 'Usuario'
@@ -28,7 +31,7 @@ let handler = async (conn, m, { pushname, sender }) => {
     const userExp = user?.xp ?? 0
     const userLevel = user?.level ?? 1
 
-    // Sistema de Rangos con Estilo
+    // Sistema de Rangos
     const getRango = (level) => {
         if (level < 5) return 'Novato 🐣'
         if (level < 15) return 'Aprendiz 🦋'
@@ -39,7 +42,7 @@ let handler = async (conn, m, { pushname, sender }) => {
     const rango = getRango(userLevel)
 
     // Cálculo de Ranking (Top Exp)
-    const sortedExp = Object.entries(db.data.users || {}).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
+    const sortedExp = Object.entries(db.data.users).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
     const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1
     const rankText = `${rankIndex} / ${totalreg}`
 
@@ -47,9 +50,8 @@ let handler = async (conn, m, { pushname, sender }) => {
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
 - ${nombreBot} es un bot privado bajo la gestión de *Z0RT SYSTEMS*. Usa el menú para explorar mis funciones.
-> ꒰⌢ ʚ˚₊‧ ✎ ꒱ ❐ ʚ˚₊‧ʚ˚₊‧ʚ˚
 
-*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊݊໑ ꒱ 𐔌 BOT - INFO 𐦯*
+*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 BOT - INFO 𐦯*
 *|✎ Creador:* 𝓐𝓪𝓻𝓸𝓶
 *|✎ Users:* ${totalreg.toLocaleString()}
 *|✎ Uptime:* ${uptime}
@@ -77,7 +79,7 @@ let handler = async (conn, m, { pushname, sender }) => {
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 GRUPOS 𐦯*
 > *✧･ﾟ: ❏ #kick*
 > *✧･ﾟ: ❏ #ban*
-> *✧･ﾟ: ❏ #promover / #degradar*`;
+> *✧･ﾟ: ❏ #promover / #degradar*`
 
     await conn.sendMessage(m.chat, { 
         text: txt,
@@ -88,6 +90,7 @@ let handler = async (conn, m, { pushname, sender }) => {
                 thumbnailUrl: global.banner,
                 sourceUrl: global.rcanal,
                 mediaType: 1,
+                showAdAttribution: true, // Esto le da un toque más oficial
                 renderLargerThumbnail: true
             }
         }
