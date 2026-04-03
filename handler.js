@@ -149,9 +149,13 @@ export const handler = async (m, conn, plugins) => {
             m.sender = senderCanonical;
         }
 
-        // Cálculo temprano de owner (necesario para textos tiernos en "comando no existe")
+        // ==================== CÁLCULO DE OWNER (DEBUG AQUÍ) ====================
         const isROwner = isRootOwnerJid(m.sender);
         const isOwner = isROwner || isOwnerJid(m.sender);
+
+        // DEBUG PARA QUE VEAMOS POR QUÉ NO TE RECONOCE COMO OWNER
+        console.log(chalk.blueBright(`[DEBUG OWNER] Sender: ${m.sender} | Normalized: ${normalizeCore(m.sender)} | IsOwner: ${isOwner} | IsROwner: ${isROwner}`));
+        console.log(chalk.blueBright(`[DEBUG OWNERS LIST] ${JSON.stringify(pickOwners(), null, 2)}`));
 
         // ==================== BÚSQUEDA DE COMANDO ====================
         let cmd = null;
@@ -200,10 +204,8 @@ export const handler = async (m, conn, plugins) => {
                 : '>_Nada... estás escribiendo puro caos 💢';
 
             const textoNoExiste = isOwner
-                ? `Ay mi amorcito, el comando *${prefix + commandName}* no existe 🥺\n` +
-                  `Pero no te preocupes, yo te ayudo siempre 💕 Usa *${prefix}menu* y te muestro todo lo bonito que tengo para ti\~`
-                : `¿Huh? El comando *${prefix + commandName}* no existe, tonto.\n` +
-                  `¿Quieres que te ayude o qué? Usa *${prefix}menu* y deja de hacerme perder el tiempo 🙄`;
+                ? `Ay mi amorcito, el comando *\( {prefix + commandName}* no existe 🥺\nPero no te preocupes, yo te ayudo siempre 💕 Usa * \){prefix}menu* y te muestro todo lo bonito que tengo para ti\~`
+                : `¿Huh? El comando *\( {prefix + commandName}* no existe, tonto.\n¿Quieres que te ayude o qué? Usa * \){prefix}menu* y deja de hacerme perder el tiempo 🙄`;
 
             return conn.sendMessage(m.chat, {
                 text: textoNoExiste + (similares.length ? `\n\n*¿Tal vez quisiste decir...?*\n${sugerencias}` : '')
@@ -408,18 +410,8 @@ export const handler = async (m, conn, plugins) => {
             }
 
             const debug = isOwner
-                ? `💢 *¡Mi amor, algo se rompió!* 💢\n` +
-                  `No te preocupes, yo te arreglo todo 🥺 Te mando el reporte para que lo veas...\n\n` +
-                  `📌 *Comando:* ${prefix + commandName}\n` +
-                  `📂 *Archivo:* ${file} (Línea: ${line})\n` +
-                  `📛 *Error:* ${name}\n\n` +
-                  `🧾 *Detalle:*\n${message.slice(0, 280)}`
-                : `💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢\n\n` +
-                  `Algo salió mal en el código… Le mandaré el reporte a mis dueños para que te regañen.\n\n` +
-                  `📌 *Comando:* ${prefix + commandName}\n` +
-                  `📂 *Archivo:* ${file} (Línea: ${line})\n` +
-                  `📛 *Error:* ${name}\n\n` +
-                  `🧾 *Detalle:*\n${message.slice(0, 280)}`;
+                ? `💢 *¡Mi amor, algo se rompió!* 💢\nNo te preocupes, yo te arreglo todo 🥺 Te mando el reporte para que lo veas...\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* \( {name}\n\n🧾 *Detalle:*\n \){message.slice(0, 280)}`
+                : `💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢\n\nAlgo salió mal en el código… Le mandaré el reporte a mis dueños para que te regañen.\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* \( {name}\n\n🧾 *Detalle:*\n \){message.slice(0, 280)}`;
 
             if (m?.reply) await m.reply(debug);
         }
