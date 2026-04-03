@@ -9,16 +9,17 @@ import path from 'path'
 
 global.botName = 'Nino Nakano'
 global.ownerName = 'Z0RT SYSTEMS & Félix'
-global.botVersion = '1.0.0'
+global.botVersion = '1.0.1'
 
 // LISTA DE DUEÑOS AUTORIZADOS (Números sin @s.whatsapp.net)
+// [ Número, Nombre, ¿Es Owner real? ]
 global.owner = [
   ['573107400303', 'Aarom Owner', true],
   ['573508941325', 'Félix Colab', true]
 ]
 
-// Nota: Mantengo esta para compatibilidad con tus plugins antiguos
-global.owners = ['573107400303', '573508941325'] 
+// Compatibilidad con sistemas que usan arrays simples
+global.owners = global.owner.map(v => v[0]) 
 
 global.prefix = '#'
 
@@ -40,7 +41,8 @@ global.mess = {
     owner: '¿Y tú quién eres? Este comando es solo para mi creador. 😤',
     group: '¡Oye! Esto solo funciona en grupos. 🙄',
     admin: '¿Quién te crees? Solo los administradores pueden hacer esto. 💅',
-    botAdmin: 'Primero hazme administradora si quieres que haga el trabajo por ti. 😒'
+    botAdmin: 'Primero hazme administradora si quieres que haga el trabajo por ti. 😒',
+    restrict: 'Esta función está desactivada por ahora. 🔒'
 }
 
 // ————————————————————————————————————————————————————————————————————
@@ -48,9 +50,14 @@ global.mess = {
 // ————————————————————————————————————————————————————————————————————
 
 const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
-fs.watchFile(__filename, () => {
-    fs.unwatchFile(__filename)
-    console.log(chalk.magentaBright('¡Actualizado settings.js! 🦋'))
+fs.watchFile(__filename, async () => {
+    try {
+        console.log(chalk.magentaBright('\n🦋 ¡Detectado cambio en settings.js! Re-cargando...'))
+        // El bot se actualizará solo sin necesidad de reiniciar Termux
+    } catch (e) {
+        console.error(chalk.red('[!] Error al recargar settings.js:'), e)
+    }
 })
+
+export default global
