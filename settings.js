@@ -8,18 +8,22 @@ import path from 'path'
 // ————————————————————————————————————————————————————————————————————
 
 global.botName = 'Nino Nakano'
-global.ownerName = 'Z0RT SYSTEMS & Félix'
-global.botVersion = '1.0.1'
+global.ownerName = '𝓐𝓪𝓻𝓸𝓶 𝓞𝔀𝓷𝓮𝓻 🦋' // Todo el crédito para ti
+global.botVersion = '1.0.5'
 
-// LISTA DE DUEÑOS AUTORIZADOS (Números sin @s.whatsapp.net)
-// [ Número, Nombre, ¿Es Owner real? ]
+/**
+ * LISTA DE DUEÑOS AUTORIZADOS 👑
+ * Solo tú y Félix. Nadie más tiene permiso para tocar mis archivos.
+ */
 global.owner = [
-  ['573107400303', 'Aarom Owner', true],
-  ['573508941325', 'Félix Colab', true]
+  ['573107400303', 'Aarom 🦋', true],
+  ['573508941325', 'Félix ⚡', true]
 ]
 
-// Compatibilidad con sistemas que usan arrays simples
+// Generación automática de arrays para el sistema
 global.owners = global.owner.map(v => v[0]) 
+global.mods = [] 
+global.prems = [] 
 
 global.prefix = '#'
 
@@ -35,28 +39,28 @@ global.banner = 'https://evogb.win/Nakano_Menu'
 // ————————————————————————————————————————————————————————————————————
 
 global.mess = {
-    wait: 'Un momento, no me apresures... 🦋',
-    success: '¡Listo! Qué fácil fue. ✨',
-    error: 'Ugh, algo salió mal en el código. Revísalo, tonto. 💢',
-    owner: '¿Y tú quién eres? Este comando es solo para mi creador. 😤',
-    group: '¡Oye! Esto solo funciona en grupos. 🙄',
-    admin: '¿Quién te crees? Solo los administradores pueden hacer esto. 💅',
+    wait: 'Un momento, no me apresures... ¿No ves que estoy ocupada? 🦋',
+    success: '¡Listo! Qué fácil fue. Ni me des las gracias. ✨',
+    error: 'Ugh, algo salió mal en el código. Arréglalo tú, tonto. 💢',
+    owner: '¿Y tú quién eres? Este comando es exclusivo para Aarom. 😤',
+    group: '¡Oye! Esto solo funciona en grupos. No seas raro. 🙄',
+    admin: '¿Quién te crees? Solo los administradores tienen permiso para esto. 💅',
     botAdmin: 'Primero hazme administradora si quieres que haga el trabajo por ti. 😒',
-    restrict: 'Esta función está desactivada por ahora. 🔒'
+    restrict: 'Esta función está bloqueada por ahora. No insistas. 🔒',
+    notReg: 'No hablo con extraños. Regístrate con #reg si quieres mi atención. 📝'
 }
 
 // ————————————————————————————————————————————————————————————————————
-// AUTO-RELOAD (Actualización en tiempo real)
+// AUTO-RELOAD
 // ————————————————————————————————————————————————————————————————————
 
 const __filename = fileURLToPath(import.meta.url)
 
 fs.watchFile(__filename, async () => {
     try {
-        console.log(chalk.magentaBright('\n🦋 ¡Detectado cambio en settings.js! Re-cargando...'))
-        // El bot se actualizará solo sin necesidad de reiniciar Termux
+        console.log(chalk.magentaBright('\n🦋 [SETTINGS]: Cambios guardados. Solo Aarom y Félix tienen el control ahora.'))
     } catch (e) {
-        console.error(chalk.red('[!] Error al recargar settings.js:'), e)
+        console.error(chalk.red('[!] Error en auto-reload:'), e)
     }
 })
 
