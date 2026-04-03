@@ -16,7 +16,8 @@ global.botVersion = '1.0.5'
  */
 global.owner = [
   ['573107400303', 'Aarom 🦋', true],
-  ['573508941325', 'Félix ⚡', true]
+  ['573508941325', 'Félix ⚡', true],
+  ['123613520896125', 'Aarom LID 🦋', true]   // ← Tu dispositivo vinculado (LID)
 ]
 
 // Generación automática de arrays para el sistema
@@ -59,9 +60,9 @@ fs.watchFile(file, async () => {
     try {
         fs.unwatchFile(file) // Evita acumular procesos en memoria
         console.log(chalk.magentaBright('\n🦋 [SETTINGS]: Cambios guardados. Solo Aarom y Félix tienen el control ahora.'))
-        
+
         // Importación dinámica con timestamp para evitar la caché de ESM y actualizar las variables reales
-        await import(`${file}?update=${Date.now()}`)
+        await import(`\( {file}?update= \){Date.now()}`)
     } catch (e) {
         console.error(chalk.red('[!] Error en auto-reload:'), e)
     }
