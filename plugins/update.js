@@ -1,53 +1,67 @@
 import { exec } from 'child_process'
+import chalk from 'chalk'
 
 /**
- * Plugin de actualización automática vía Git
+ * Sistema de Actualización Automática - Nino Bot
+ * @param {import('../lib/simple').smsg} m 
  */
-let handler = async (conn, m, { text, isOwner }) => {
-    // Nota: El handler ya bloquea si pones 'handler.owner = true' abajo, 
-    // pero dejamos este mensaje por si acaso con la personalidad de Nino.
-    if (!isOwner) return m.reply('🦋 *¡Oye!* ¿Qué crees que haces intentando tocar mis archivos? Solo Aarom puede actualizarme. 💅💢')
+let handler = async (m, { conn, isOwner }) => {
+    // 1. Doble seguridad de Owner (Aunque el handler ya lo hace)
+    if (!isOwner) return m.reply('¿Qué crees que estás haciendo? 🙄 Solo mi creador puede tocar mis archivos internos. ¡Aléjate! 💅💢')
 
-    await m.reply('Revisando si hay algo nuevo en el repositorio... No me hagas esperar. 🦋')
+    await m.reply('Ugh, está bien... Revisaré si hay algo nuevo en el repositorio. No me hagas esperar mucho. 🦋')
 
+    // 2. Ejecutamos el comando Git
     exec('git pull', async (err, stdout, stderr) => {
         if (err) {
-            return m.reply(`❌ *¡Ugh, un error!* \n\n\`\`\`${err.message}\`\`\``)
+            console.error(chalk.red('[ERROR UPDATE]:'), err)
+            return m.reply(`❌ *¡UGH! ALGO SALIÓ MAL...* \n\n_Seguro Aarom rompió algo en el código. Arréglalo tonto:_\n\`\`\`${err.message}\`\`\``)
         }
 
+        // 3. Caso: Ya está actualizado
         if (stdout.includes('Already up to date')) {
-            return m.reply('No hay nada nuevo, tonto. El bot ya está actualizado a la última versión. 🙄✨')
+            return m.reply('No hay nada nuevo, tonto. Ya estoy en mi mejor versión. 🙄✨')
         }
 
+        // 4. Caso: Hay cambios nuevos
         if (stdout.includes('Updating') || stdout.includes('unpacking')) {
-            let updateMsg = `✅ *¡ACTUALIZACIÓN EXITOSA!*\n\n*Cambios detectados:* \n\`\`\`${stdout}\`\`\`\n\nReiniciando el sistema para aplicar los cambios... No te vayas. 🦋`
+            let updateMsg = `✅ *¡SISTEMA ACTUALIZADO CON ÉXITO!* 🦋
+
+> ꒰⌢ ʚ˚₊‧ ✎ ꒱ *CAMBIOS:*
+\`\`\`${stdout}\`\`\`
+
+Reiniciando el sistema para aplicar las mejoras de *Z0RT SYSTEMS*... No te vayas, volveré enseguida. 💅✨`.trim()
 
             await conn.sendMessage(m.chat, { 
                 text: updateMsg,
                 contextInfo: {
                     externalAdReply: {
-                        title: 'NINO - SISTEMA ACTUALIZADO',
-                        body: 'Power by 𝓐𝓪𝓻om | Z0RT SYSTEMS',
-                        thumbnailUrl: global.banner, // Asegúrate de tener global.banner en settings.js
+                        title: '🦋 NINO UPDATE SYSTEM 🦋',
+                        body: 'Sincronización de Archivos Exitosa',
+                        thumbnailUrl: global.banner,
                         sourceUrl: global.rcanal,
                         mediaType: 1,
+                        showAdAttribution: true,
                         renderLargerThumbnail: true
                     }
                 }
             }, { quoted: m })
 
-            // Esperamos un segundo antes de apagar para que el mensaje se envíe bien
+            // 5. Reinicio Automático
+            // Esto solo funciona si usas un script 'sh start.sh' o 'pm2'
+            console.log(chalk.magentaBright('\n[!] Reiniciando bot por actualización...\n'))
             setTimeout(() => {
                 process.exit(0)
-            }, 1500)
+            }, 2000)
+
         } else {
-            return m.reply(`⚠️ *Respuesta extraña de Git:* \n\n${stdout || stderr}`)
+            // 6. Respuestas inesperadas
+            return m.reply(`⚠️ *RESPUESTA INESPERADA:* \n\n${stdout || stderr}`)
         }
     })
 }
 
-// --- CONFIGURACIÓN DEL COMANDO ---
-handler.command = ['update', 'actualizar', 'gitpull'] // Comandos que activan el plugin
-handler.owner = true // 🛡️ EL HANDLER BLOQUEA AUTOMÁTICAMENTE A LOS QUE NO SEAN OWNER
+handler.command = ['update', 'actualizar', 'gitpull', 'fix']
+handler.owner = true // Solo los owners registrados en settings.js
 
 export default handler
