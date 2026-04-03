@@ -151,7 +151,6 @@ export const handler = async (m, conn, plugins) => {
             senderJid = senderCanonical;
         }
 
-        // Si es @lid (dispositivo vinculado), intentamos resolverlo usando el grupo (si está en grupo)
         if (senderJid.endsWith('@lid') && m.isGroup) {
             try {
                 const groupMeta = await conn.groupMetadata(m.chat);
@@ -168,7 +167,6 @@ export const handler = async (m, conn, plugins) => {
             } catch {}
         }
 
-        // Cálculo de owner (ahora más robusto con LID)
         const isROwner = isRootOwnerJid(senderJid);
         const isOwner = isROwner || isOwnerJid(senderJid);
 
@@ -215,16 +213,18 @@ export const handler = async (m, conn, plugins) => {
                 .slice(0, 3);
 
             const sugerencias = similares.length
-                ? similares.map(s => `> ✧ \`\( {prefix + s.cmd}\` → * \){s.score}%*`).join('\n')
-                : '>_Nada... estás escribiendo puro caos 💢';
+                ? similares.map(s => `> ✧ \`${prefix + s.cmd}\` → *${s.score}%*`).join('\n')
+                : '> _Nada... estás escribiendo puro caos_ 💢';
 
             const textoNoExiste = isOwner
-                ? `Ay mi amorcito, el comando *\( {prefix + commandName}* no existe 🥺\nPero no te preocupes, yo te ayudo siempre 💕 Usa * \){prefix}menu* y te muestro todo lo bonito que tengo para ti\~`
-                : `¿Huh? El comando *\( {prefix + commandName}* no existe, tonto.\n¿Quieres que te ayude o qué? Usa * \){prefix}menu* y deja de hacerme perder el tiempo 🙄`;
+                ? `Ay mi amorcito, el comando *${prefix + commandName}* no existe 🥺\nPero no te preocupes, yo te ayudo siempre 💕 Usa *${prefix}menu* y te muestro todo lo bonito que tengo para ti~`
+                : `¿Huh? El comando *${prefix + commandName}* no existe, tonto.\n¿Quieres que te ayude o qué? Usa *${prefix}menu* y deja de hacerme perder el tiempo 🙄`;
 
-            return conn.sendMessage(m.chat, {
-                text: textoNoExiste + (similares.length ? `\n\n*¿Tal vez quisiste decir...?*\n${sugerencias}` : '')
-            }, { quoted: m });
+            const finalMessage = similares.length
+                ? `${textoNoExiste}\n\n*¿Tal vez quisiste decir...?*\n${sugerencias}`
+                : `${textoNoExiste}\n\n${sugerencias}`;
+
+            return conn.sendMessage(m.chat, { text: finalMessage }, { quoted: m });
         }
 
         const isPremium = isOwner || isPremiumJid(senderJid);
@@ -277,7 +277,6 @@ export const handler = async (m, conn, plugins) => {
             };
         }
 
-        // Resolución who (LID)
         let who = null;
         if (m.mentionedJid?.[0]) who = m.mentionedJid[0];
         else if (m.quoted?.sender) who = m.quoted.sender;
@@ -307,7 +306,7 @@ export const handler = async (m, conn, plugins) => {
             }
         }
 
-        // ===================== VALIDACIONES (tiernas para owner) =====================
+        // ===================== VALIDACIONES =====================
         if (isGroup && database.data.groups[m.chat]?.modoadmin && !isAdmin && !isOwner) {
             const msg = isOwner ? `Mi amor, modo admin activo... pero tú eres mi dueño, así que pasa 💕` : `⚙️ *MODO ADMIN ACTIVO*\nSolo los administradores pueden darme órdenes aquí, cariño. Ni lo intentes 💅`;
             return m.reply(msg);
@@ -324,7 +323,7 @@ export const handler = async (m, conn, plugins) => {
         }
 
         if (cmd.owner && !isOwner) {
-            const msg = isOwner ? `Claro mi rey, este comando es solo para ti 💕` : `👑 *ACCESO RESTRINGIDO*\nSolo mis dueños pueden tocar esto. Tú no entras en esa lista, lo siento\~ 💅`;
+            const msg = isOwner ? `Claro mi rey, este comando es solo para ti 💕` : `👑 *ACCESO RESTRINGIDO*\nSolo mis dueños pueden tocar esto. Tú no entras en esa lista, lo siento~ 💅`;
             return m.reply(msg);
         }
 
@@ -334,7 +333,7 @@ export const handler = async (m, conn, plugins) => {
         }
 
         if (cmd.register && !isRegistered) {
-            const msg = isOwner ? `Ya estás registrado en mi corazón mi amor, pero si quieres usa el comando normal 💕` : `📝 *NO ESTÁS REGISTRADO*\nNo hablo con extraños, sorry. Regístrate primero si quieres mi atención.\n\n> Usa: *\( {prefix}reg nombre.edad*\n> Ejemplo: * \){prefix}reg tonto.18* 🦋`;
+            const msg = isOwner ? `Ya estás registrado en mi corazón mi amor, pero si quieres usa el comando normal 💕` : `📝 *NO ESTÁS REGISTRADO*\nNo hablo con extraños, sorry. Regístrate primero si quieres mi atención.\n\n> Usa: *${prefix}reg nombre.edad*\n> Ejemplo: *${prefix}reg tonto.18* 🦋`;
             return m.reply(msg);
         }
 
@@ -403,8 +402,8 @@ export const handler = async (m, conn, plugins) => {
             }
 
             const debug = isOwner
-                ? `💢 *¡Mi amor, algo se rompió!* 💢\nNo te preocupes, yo te arreglo todo 🥺 Te mando el reporte para que lo veas...\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* \( {name}\n\n🧾 *Detalle:*\n \){message.slice(0, 280)}`
-                : `💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢\n\nAlgo salió mal en el código… Le mandaré el reporte a mis dueños para que te regañen.\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* \( {name}\n\n🧾 *Detalle:*\n \){message.slice(0, 280)}`;
+                ? `💢 *¡Mi amor, algo se rompió!* 💢\nNo te preocupes, yo te arreglo todo 🥺 Te mando el reporte para que lo veas...\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* ${name}\n\n🧾 *Detalle:*\n ${message.slice(0, 280)}`
+                : `💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢\n\nAlgo salió mal en el código… Le mandaré el reporte a mis dueños para que te regañen.\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* ${name}\n\n🧾 *Detalle:*\n ${message.slice(0, 280)}`;
 
             if (m?.reply) await m.reply(debug);
         }
