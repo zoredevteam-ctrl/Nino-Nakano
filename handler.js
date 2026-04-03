@@ -237,7 +237,7 @@ export const handler = async (m, conn, plugins) => {
         }
 
         if (cmd.admin && !isAdmin) {
-            return m.reply('👮 *ADMINS*\n\nSolo los administradores del grupo pueden pedirme esto. ¡Espero que lo entiendas! 🥰🌸');
+            return m.reply('👮 *ADMINS*\n\nSolo los administradores del grupo pueden pedirme esto. ¡Espero que lo entiendas! 😼🌸');
         }
 
         if (cmd.botAdmin && !isBotAdmin) {
@@ -256,7 +256,7 @@ export const handler = async (m, conn, plugins) => {
             await cmd(m, { conn, args, isOwner, isROwner, isPremium, isAdmin, isBotAdmin, isGroup: m.isGroup, prefix, plugins })
         } catch (e) {
             console.log(chalk.red('\n[!] ERROR EN PLUGIN:'), e)
-            m.reply(`🌸 *¡AY! ALGO SALIÓ MAL...*\n\nPerdóname, hubo un errorcito al procesar el comando. 🥺 Aarom ya debe estar avisado para arreglarlo. 🥰\n\n\`\`\`${e.message}\`\`\``)
+            m.reply(`🌸 *¡AY! ALGO SALIÓ MAL...*\n\nPerdóname, hubo un errorcito al procesar el comando. 🥺 Aarom ya debe estar avisado para arreglarlo. \n\n\`\`\`${e.message}\`\`\``)
         }
 
     } catch (e) {
