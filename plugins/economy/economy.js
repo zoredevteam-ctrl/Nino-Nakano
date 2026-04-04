@@ -1,16 +1,3 @@
-// fetch nativo disponible desde Node 18+, no requiere node-fetch
-const fetch = globalThis.fetch ?? (await import('node-fetch')).default
-
-/**
- * ECONOMY SYSTEM - NINO NAKANO (100% FUNCIONAL)
- * Adaptado exactamente a tu handler.js
- * Usa el "db" que le pasas en el contexto
- * Cooldowns por usuario (se guardan en database.data.users)
- * Estilo Nino Nakano suave y cute (nada grosero)
- * #chamba es troll como pediste
- * Usa tu newsletter (rcanal + banner)
- */
-
 const toMs = (h = 0, m = 0, s = 0) => ((h * 3600) + (m * 60) + s) * 1000
 const randInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min
 
