@@ -32,7 +32,7 @@ global.prefix = '#'
 // ————————————————————————————————————————————————————————————————————
 
 global.rcanal = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y'
-global.banner = 'https://evogb.win/Nakano_Menu' 
+global.banner = 'https://causas-files.vercel.app/fl/cyns.png' 
 
 // ————————————————————————————————————————————————————————————————————
 // MENSAJES DE SISTEMA (Estilo Tsundere 🦋)
