@@ -16,6 +16,7 @@ import {
   DisconnectReason
 } from '@whiskeysockets/baileys'
 import { handler } from './handler.js'
+import { reconnectAllSubBots } from './lib/subbot-manager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pluginsDir = path.join(__dirname, 'plugins')
@@ -32,7 +33,7 @@ const log = {
 const n2 = chalk.hex('#FF69B4')
 const n3 = chalk.hex('#DA70D6')
 
-// ─── BANNER (letras más pequeñas con figlet-style compacto) ──────────────────
+// ─── BANNER ──────────────────────────────────────────────────────────────────
 const ninoBanner = `
 ${n3('🦋 ─────────────────────────────────────────────────────────────── 🦋')}
 
@@ -57,7 +58,6 @@ async function loadPlugins() {
   for (const file of files) {
     try {
       const filePath = path.resolve(pluginsDir, file)
-      // BUGFIX: se corrigió el template literal roto que tenía \( y \) mal escapados
       const plugin = (await import(`file://${filePath}?t=${Date.now()}`)).default
       if (plugin) {
         plugins.set(file, plugin)
@@ -157,7 +157,6 @@ async function startBot() {
     }
 
     if (connection === 'close') {
-      // BUGFIX: se usaba new Error() innecesariamente sobre un objeto que ya era Error
       const statusCode = lastDisconnect?.error?.output?.statusCode
       const reason     = lastDisconnect?.error?.message || 'Desconocido'
 
@@ -184,7 +183,6 @@ async function startBot() {
         }
 
         if (anu.action === 'add') {
-          // BUGFIX: se corrigieron los template literals rotos con \( y \)
           const txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`
           await conn.sendMessage(anu.id, {
             text: txt,
@@ -237,8 +235,12 @@ async function startBot() {
 }
 
 // ─── ARRANQUE ────────────────────────────────────────────────────────────────
-(async () => {
+;(async () => {
   await loadPlugins()
   global.plugins = plugins
   await startBot()
+
+  // ✅ Reconectar sub-bots guardados al arrancar
+  const { database } = await import('./lib/database.js')
+  await reconnectAllSubBots(database.data)
 })()
