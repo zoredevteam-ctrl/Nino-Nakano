@@ -28,23 +28,25 @@ const formatDelta = ms => {
 
 const ensureUser = (db, jid) => {
     if (!db.users) db.users = {}
-    if (!db.users[jid]) {
-        db.users[jid] = {
-            exp: 0,
-            money: 0,
-            bank: 0,
-            level: 1,
-            lastDaily: 0,
-            lastCofre: 0,
-            lastMinar: 0,
-            lastWork: 0,
-            lastRob: 0,
-            lastRob2: 0,
-            lastCrime: 0  // ✅ FIX: agregado cooldown de crime
-        }
+    if (!db.users[jid]) db.users[jid] = {}
+
+    // Merge: solo agrega los campos que falten, sin pisar los del handler
+    const defaults = {
+        exp: 0,
+        money: 0,
+        bank: 0,
+        level: 1,
+        lastDaily: 0,
+        lastCofre: 0,
+        lastMinar: 0,
+        lastWork: 0,
+        lastRob: 0,
+        lastRob2: 0,
+        lastCrime: 0
     }
-    // ✅ FIX: compatibilidad con usuarios viejos que no tienen lastCrime
-    if (typeof db.users[jid].lastCrime === 'undefined') db.users[jid].lastCrime = 0
+    for (const [k, v] of Object.entries(defaults)) {
+        if (db.users[jid][k] === undefined) db.users[jid][k] = v
+    }
     return db.users[jid]
 }
 
