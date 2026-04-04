@@ -366,11 +366,13 @@ export const handler = async (m, conn, plugins) => {
             database.data.users[senderJid].limit -= 1;
         }
 
-        // ===================== EJECUCIÓN =====================
+        // ===================== EJECUCIÓN ✅ FIX: cmd.run + text + command =====================
         try {
-            await cmd(m, {
+            await cmd.run(m, {
                 conn,
                 args,
+                text: args.join(' '),   // ✅ para plugins que usan text
+                command: commandName,   // ✅ para plugins que usan command
                 isOwner,
                 isROwner,
                 isPremium,
