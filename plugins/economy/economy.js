@@ -113,14 +113,14 @@ export default {
 
                     if (now - (u[key] || 0) < cd) {
                         const rem = (u[key] || 0) + cd - now
-                        return sendAsChannel({ text: t(`💕 Vuelve en *\( {formatDelta(rem)}* para reclamar tu recompensa.`, `Mi amor, aún faltan * \){formatDelta(rem)}* para tu daily 🥺`) }, { quoted: m })
+                        return sendAsChannel({ text: t(`💕 Vuelve en *${formatDelta(rem)}* para reclamar tu recompensa.`, `Mi amor, aún faltan *${formatDelta(rem)}* para tu daily 🥺`) }, { quoted: m })
                     }
 
                     const amount = randInt(150, 650)
                     u.money = (u.money || 0) + amount
                     u[key] = now
 
-                    return sendAsChannel({ text: t(`💕 Reclamaste tu *\( {cmd === 'daily' ? 'recompensa diaria' : 'cofre'}*.\n\n🌸 * \){currency}:* +${amount}`, `💖 Mi rey, aquí tienes tu recompensa diaria\~ ${amount} ${currency} 🥰`) }, { quoted: m })
+                    return sendAsChannel({ text: t(`💕 Reclamaste tu *${cmd === 'daily' ? 'recompensa diaria' : 'cofre'}*.\n\n🌸 *${currency}:* +${amount}`, `💖 Mi rey, aquí tienes tu recompensa diaria\~ ${amount} ${currency} 🥰`) }, { quoted: m })
                 }
 
                 // MINAR
@@ -130,7 +130,7 @@ export default {
 
                     if (now - (u.lastMinar || 0) < cd) {
                         const rem = (u.lastMinar || 0) + cd - now
-                        return sendAsChannel({ text: t(`💕 Espera *\( {formatDelta(rem)}* para minar otra vez.`, `Mi cielo, faltan * \){formatDelta(rem)}* para minar 🥺`) }, { quoted: m })
+                        return sendAsChannel({ text: t(`💕 Espera *${formatDelta(rem)}* para minar otra vez.`, `Mi cielo, faltan *${formatDelta(rem)}* para minar 🥺`) }, { quoted: m })
                     }
 
                     const addExp = randInt(30, 90)
@@ -139,7 +139,7 @@ export default {
                     u.money = (u.money || 0) + addMoney
                     u.lastMinar = now
 
-                    return sendAsChannel({ text: t(`💕 Estuviste minando...\n\n✨ *Exp:* +\( {addExp}\n🌸 * \){currency}:* +${addMoney}`, `💖 Mi amor estuvo trabajando duro\~ Ganaste ${addExp} Exp y ${addMoney} ${currency} 🥰`) }, { quoted: m })
+                    return sendAsChannel({ text: t(`💕 Estuviste minando...\n\n✨ *Exp:* +${addExp}\n🌸 *${currency}:* +${addMoney}`, `💖 Mi amor estuvo trabajando duro\~ Ganaste ${addExp} Exp y ${addMoney} ${currency} 🥰`) }, { quoted: m })
                 }
 
                 // WORK / TRABAJAR / CHAMBA (TROLL)
@@ -151,7 +151,7 @@ export default {
 
                     if (now - (u.lastWork || 0) < cd) {
                         const rem = (u.lastWork || 0) + cd - now
-                        return sendAsChannel({ text: t(`💕 Espera *\( {formatDelta(rem)}* para trabajar de nuevo.`, `Mi rey, aún faltan * \){formatDelta(rem)}* para chambear 🥺`) }, { quoted: m })
+                        return sendAsChannel({ text: t(`💕 Espera *${formatDelta(rem)}* para trabajar de nuevo.`, `Mi rey, aún faltan *${formatDelta(rem)}* para chambear 🥺`) }, { quoted: m })
                     }
 
                     let addMoney, msg
@@ -194,7 +194,7 @@ export default {
 
                     if (now - (u[cdKey] || 0) < cd) {
                         const rem = (u[cdKey] || 0) + cd - now
-                        return sendAsChannel({ text: t(`💕 Espera *\( {formatDelta(rem)}* para robar de nuevo.`, `Mi cielo, faltan * \){formatDelta(rem)}* para robar 🥺`) }, { quoted: m })
+                        return sendAsChannel({ text: t(`💕 Espera *${formatDelta(rem)}* para robar de nuevo.`, `Mi cielo, faltan *${formatDelta(rem)}* para robar 🥺`) }, { quoted: m })
                     }
 
                     let target = m.quoted?.sender || m.mentionedJid?.[0]
@@ -210,14 +210,14 @@ export default {
                         victim.exp = 0
                         u.exp = (u.exp || 0) + stolen
                         u.lastRob = now
-                        return sendAsChannel({ text: `💕 Le robaste *\( {stolen} Exp* a @ \){target.split('@')[0]}`, mentions: [target] }, { quoted: m })
+                        return sendAsChannel({ text: `💕 Le robaste *${stolen} Exp* a @${target.split('@')[0]}`, mentions: [target] }, { quoted: m })
                     } else {
                         const stolen = victim.money || 0
                         if (!stolen) return sendAsChannel({ text: '💕 Esta persona no tiene dinero.' }, { quoted: m })
                         victim.money = 0
                         u.money = (u.money || 0) + stolen
                         u.lastRob2 = now
-                        return sendAsChannel({ text: `💕 Le robaste *${stolen} \( {currency}* a @ \){target.split('@')[0]}`, mentions: [target] }, { quoted: m })
+                        return sendAsChannel({ text: `💕 Le robaste *${stolen} ${currency}* a @${target.split('@')[0]}`, mentions: [target] }, { quoted: m })
                     }
                 }
 
@@ -272,7 +272,7 @@ export default {
                     if (!top.length) return sendAsChannel({ text: '💕 No hay usuarios en este grupo.' }, { quoted: m })
 
                     let txt = '💕 *TOP 10 MÁS RICOS* 💕\n\n'
-                    top.forEach((p, i) => txt += `\( {i + 1}. @ \){p.jid.split('@')[0]} → ${p.total} ${currency}\n`)
+                    top.forEach((p, i) => txt += `${i + 1}. @${p.jid.split('@')[0]} → ${p.total} ${currency}\n`)
 
                     return sendAsChannel({ text: txt, mentions: top.map(p => p.jid) }, { quoted: m })
                 }
@@ -285,7 +285,7 @@ export default {
                     u.exp -= 1000
                     u.level = (u.level || 1) + 1
 
-                    return sendAsChannel({ text: t(`💕 *LEVEL UP* 💕\n\n🌸 Nivel actual: *\( {u.level}*`, `💖 ¡Mi rey subió de nivel! Ahora estás en el nivel * \){u.level}* 🥰`) }, { quoted: m })
+                    return sendAsChannel({ text: t(`💕 *LEVEL UP* 💕\n\n🌸 Nivel actual: *${u.level}*`, `💖 ¡Mi rey subió de nivel! Ahora estás en el nivel *${u.level}* 🥰`) }, { quoted: m })
                 }
 
                 // SHOP / TIENDA
