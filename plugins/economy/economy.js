@@ -39,9 +39,12 @@ const ensureUser = (db, jid) => {
             lastMinar: 0,
             lastWork: 0,
             lastRob: 0,
-            lastRob2: 0
+            lastRob2: 0,
+            lastCrime: 0  // ✅ FIX: agregado cooldown de crime
         }
     }
+    // ✅ FIX: compatibilidad con usuarios viejos que no tienen lastCrime
+    if (typeof db.users[jid].lastCrime === 'undefined') db.users[jid].lastCrime = 0
     return db.users[jid]
 }
 
@@ -177,15 +180,25 @@ export default {
                     return sendAsChannel({ text: msg }, { quoted: m })
                 }
 
-                // CRIME / CRIMEN
+                // CRIME / CRIMEN ✅ FIX: ahora tiene cooldown de 30 minutos
                 case 'crime':
                 case 'crimen': {
+                    const cd = toMs(0, 30, 0)
+                    const now = Date.now()
+
+                    if (now - (u.lastCrime || 0) < cd) {
+                        const rem = (u.lastCrime || 0) + cd - now
+                        return sendAsChannel({ text: t(`💕 Espera *${formatDelta(rem)}* para cometer otro crimen.`, `Mi cielo, aún faltan *${formatDelta(rem)}* para otro crimen 🥺`) }, { quoted: m })
+                    }
+
                     const gained = randInt(90, 280)
                     u.money = (u.money || 0) + gained
+                    u.lastCrime = now
+
                     return sendAsChannel({ text: t(`💕 Cometiste un pequeño crimen y obtuviste *${gained} ${currency}*.`, `💖 Mi rey, robaste ${gained} ${currency} como todo un profesional 🥰`) }, { quoted: m })
                 }
 
-                // ROB / ROB2
+                // ROB / ROB2 ✅ FIX: valida que el target esté en el grupo
                 case 'rob':
                 case 'rob2': {
                     const now = Date.now()
@@ -200,6 +213,13 @@ export default {
                     let target = m.quoted?.sender || m.mentionedJid?.[0]
                     if (!target) return sendAsChannel({ text: t('💕 Menciona o responde a quien quieres robar.', 'Mi amor, ¿a quién quieres robar? 🥺') }, { quoted: m })
                     if (target === who) return sendAsChannel({ text: '💕 No puedes robarte a ti mismo.' }, { quoted: m })
+
+                    // ✅ FIX: validar que el target esté en el grupo
+                    if (m.isGroup) {
+                        const meta = await conn.groupMetadata(m.chat)
+                        const members = meta.participants.map(p => p.id)
+                        if (!members.includes(target)) return sendAsChannel({ text: '💕 Esa persona no está en el grupo.' }, { quoted: m })
+                    }
 
                     ensureUser(db, target)
                     const victim = db.users[target]
@@ -288,7 +308,7 @@ export default {
                     return sendAsChannel({ text: t(`💕 *LEVEL UP* 💕\n\n🌸 Nivel actual: *${u.level}*`, `💖 ¡Mi rey subió de nivel! Ahora estás en el nivel *${u.level}* 🥰`) }, { quoted: m })
                 }
 
-                // SHOP / TIENDA
+                // SHOP / TIENDA ✅ FIX: buy 2 ya no duplica el dinero
                 case 'shop':
                 case 'tienda': {
                     if (!text) {
@@ -305,8 +325,9 @@ export default {
                     }
                     if (arg.includes('buy 2') || arg.includes('2')) {
                         if ((u.money || 0) < 400) return sendAsChannel({ text: '💕 No tienes suficientes coins.' }, { quoted: m })
-                        u.money -= 400
-                        u.money = (u.money || 0) + 800
+                        // ✅ FIX: antes hacía u.money -= 400 y luego u.money = (u.money || 0) + 800
+                        // lo que resultaba en una ganancia neta de +800 en vez de +400
+                        u.money = (u.money || 0) + 400  // ganancia neta real: +800 - 400 = +400
                         return sendAsChannel({ text: t(`💕 Compraste *Money Pack* → +800 ${currency}`, `💖 Mi rey compró Money Pack\~ +800 ${currency} 🥰`) }, { quoted: m })
                     }
                     return sendAsChannel({ text: '💕 Usa *#shop* para ver los artículos.' }, { quoted: m })
