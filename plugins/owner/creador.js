@@ -1,5 +1,3 @@
-import { interface } from 'readline'
-
 /**
  * Comando de Contacto - Nino Bot (Edición Tierna)
  * @param {import('../lib/simple').smsg} m 
@@ -7,7 +5,7 @@ import { interface } from 'readline'
 let handler = async (m, { conn }) => {
     const contactNumber = '573107400303'
     const name = 'Aarom'
-    
+
     // Formato VCard para el contacto
     const vcard = `BEGIN:VCARD
 VERSION:3.0
@@ -37,7 +35,7 @@ END:VCARD`
         }
     }, { quoted: m })
 
-    await m.reply('¡Hola! Aquí tienes el contacto de Aarom. Él es quien creó todo mi sistema y quien me cuida siempre. ✨🦋 Si necesitas algo importante, puedes escribirle con respeto.')
+    await m.reply('¡Hola! Aquí tienes el contacto de Aarom. Él es quien creó todo mi sistema y quien me cuida siempre. ✨🦋 Si necesitas algo importante, puedes escribirle.')
 }
 
 handler.help = ['owner', 'creator']
