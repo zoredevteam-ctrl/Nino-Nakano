@@ -1,4 +1,5 @@
-import fetch from 'node-fetch'
+// fetch nativo disponible desde Node 18+, no requiere node-fetch
+const fetch = globalThis.fetch ?? (await import('node-fetch')).default
 
 /**
  * ECONOMY SYSTEM - NINO NAKANO (100% FUNCIONAL)
