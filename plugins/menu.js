@@ -80,11 +80,11 @@ Es un gusto verte de nuevo. Soy *${nombreBot}* y estoy aquí para ayudarte en lo
 *|✎ Ranking:* ${rankText}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*╭╼𝅄꒰🤖 ꒱ 𐔌 SUB-BOTS 𐦯*
+*╭╼𝅄꒰👑꒱ 𐔌 SUB-BOTS 𐦯*
 *|✎ Conectados:* ${totalSubbots} / 30
 *|✎ Vincular:* ${prefix}code
 *|✎ Ver lista:* ${prefix}subbots
-*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🤖◌⃘⃪۪𐇽֟፝۫۬🤖◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ👑◌⃘⃪۪𐇽֟፝۫۬👑◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗙𝗨𝗡𝗖𝗜𝗢𝗡𝗘𝗦*
 _Aquí tienes todo lo que puedo hacer por ti:_
