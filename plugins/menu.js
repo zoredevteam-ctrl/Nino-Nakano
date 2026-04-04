@@ -2,17 +2,17 @@ import { database } from '../lib/database.js'
 
 /**
  * Menú Principal - Nino Nakano
- * Con sección de Sub-Bots y rcanal fijo
+ * Corregido: rcanal desde global, usuarios nuevos seguros
  */
-
-const RCANAL = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 
 let handler = async (m, { conn, usedPrefix }) => {
     try {
         const sender = m.sender
-        const prefix = usedPrefix || '#'
+        const prefix = usedPrefix || global.prefix || '#'
         const username = m.pushName || 'Tesoro'
         const nombreBot = global.botName || 'Nino Nakano'
+        const canalLink = global.rcanal || ''
+        const bannerUrl = global.banner || ''
 
         // Ping / Latencia
         const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
@@ -26,19 +26,18 @@ let handler = async (m, { conn, usedPrefix }) => {
         const s = Math.floor(uptimeSeconds % 60)
         const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-        // Base de Datos
+        // Base de Datos — seguro para usuarios nuevos
         const users = database.data?.users || {}
-        const user = users[sender] || { limit: 0, xp: 0, level: 1 }
+        const user = users[sender] || {}
         const totalreg = Object.keys(users).length
 
         const userMoney = user.limit ?? 0
-        const userExp = user.xp ?? 0
+        const userExp = user.xp ?? user.exp ?? 0
         const userLevel = user.level ?? 1
 
         // Sub-bots activos
         const subbots = database.data?.subbots || {}
         const totalSubbots = Object.keys(subbots).filter(k => subbots[k]?.connected).length
-        const maxSubbots = 30
 
         // Rangos
         const getRango = (level) => {
@@ -50,12 +49,13 @@ let handler = async (m, { conn, usedPrefix }) => {
         }
         const rango = getRango(userLevel)
 
-        // Ranking
-        const sortedExp = Object.entries(users).sort((a, b) => (b[1]?.xp || 0) - (a[1]?.xp || 0))
-        const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1
-        const rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : `---`
-
-        const canalLink = global.rcanal || RCANAL
+        // Ranking — seguro aunque no haya usuarios
+        let rankText = '---'
+        try {
+            const sortedExp = Object.entries(users).sort((a, b) => (b[1]?.xp || b[1]?.exp || 0) - (a[1]?.xp || a[1]?.exp || 0))
+            const rankIndex = sortedExp.findIndex(u => u[0] === sender) + 1
+            rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : '---'
+        } catch {}
 
         let txt = `¡Hola, *${username}*! ✨ 
 Es un gusto verte de nuevo. Soy *${nombreBot}* y estoy aquí para ayudarte en lo que necesites. ¡Espero que tengamos un lindo día! 🌸🦋
@@ -80,11 +80,11 @@ Es un gusto verte de nuevo. Soy *${nombreBot}* y estoy aquí para ayudarte en lo
 *|✎ Ranking:* ${rankText}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*╭╼𝅄꒰🦋꒱ 𐔌 SUB-BOTS 𐦯*
-*|✎ Conectados:* ${totalSubbots} / ${maxSubbots}
+*╭╼𝅄꒰🤖 ꒱ 𐔌 SUB-BOTS 𐦯*
+*|✎ Conectados:* ${totalSubbots} / 30
 *|✎ Vincular:* ${prefix}code
 *|✎ Ver lista:* ${prefix}subbots
-*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ👑◌⃘⃪۪𐇽֟፝۫۬👑◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🤖◌⃘⃪۪𐇽֟፝۫۬🤖◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗙𝗨𝗡𝗖𝗜𝗢𝗡𝗘𝗦*
 _Aquí tienes todo lo que puedo hacer por ti:_
@@ -110,7 +110,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}shop*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
-> *✧･ﾟ: ❏ ${prefix}code*
+> *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots*
 > *✧･ﾟ: ❏ ${prefix}setnombre <nombre>*
 > *✧･ﾟ: ❏ ${prefix}setbanner [imagen]*
@@ -122,7 +122,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
                 externalAdReply: {
                     title: `🌸 ${nombreBot.toUpperCase()} 🌸`,
                     body: 'Panel de Control de Aarom',
-                    thumbnailUrl: global.banner || '',
+                    thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
                     mediaType: 1,
                     showAdAttribution: true,
@@ -132,8 +132,10 @@ _Aquí tienes todo lo que puedo hacer por ti:_
         }, { quoted: m })
 
     } catch (e) {
-        console.error(e)
-        m.reply(`🌸 *Ups...* \nHubo un pequeño problema al mostrar el menú. ¡Pero no te preocupes, Aarom lo solucionará pronto!`)
+        console.error('[MENU ERROR]', e)
+        try {
+            await m.reply(`🌸 *Ups...* \nHubo un pequeño problema al mostrar el menú. ¡Pero no te preocupes, Aarom lo solucionará pronto!`)
+        } catch {}
     }
 }
 
