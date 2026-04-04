@@ -17,6 +17,7 @@ import {
 } from '@whiskeysockets/baileys'
 import { handler } from './handler.js'
 import { reconnectAllSubBots } from './lib/subbot-manager.js'
+import { database } from './lib/database.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pluginsDir = path.join(__dirname, 'plugins')
@@ -236,11 +237,13 @@ async function startBot() {
 
 // ─── ARRANQUE ────────────────────────────────────────────────────────────────
 ;(async () => {
+  // ✅ Cargar base de datos primero
+  await database.read()
+
   await loadPlugins()
   global.plugins = plugins
   await startBot()
 
   // ✅ Reconectar sub-bots guardados al arrancar
-  const { database } = await import('./lib/database.js')
   await reconnectAllSubBots(database.data)
 })()
