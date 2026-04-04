@@ -1,4 +1,5 @@
 import { database } from '../lib/database.js'
+import { downloadMediaMessage } from '@whiskeysockets/baileys'
 import { startSubBot, stopSubBot, getSubBots } from '../lib/subbot-manager.js'
 
 /**
@@ -232,10 +233,14 @@ export default {
                     quoted?.message?.imageMessage ||
                     msg?.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage
 
-                const stream = await conn.downloadMediaMessage({ message: { imageMessage: imgMsg } })
-                const chunks = []
-                for await (const chunk of stream) chunks.push(chunk)
-                const buffer = Buffer.concat(chunks)
+                // Construir el mensaje correcto para downloadMediaMessage
+                const msgForDownload = quoted?.message || m.message
+                const buffer = await downloadMediaMessage(
+                    { message: msgForDownload },
+                    'buffer',
+                    {},
+                    { logger: console, reuploadRequest: conn.updateMediaMessage }
+                )
                 const base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`
 
                 if (isOwner && !miSubbot) {
