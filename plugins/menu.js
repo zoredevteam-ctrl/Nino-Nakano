@@ -14,6 +14,12 @@ let handler = async (m, { conn, usedPrefix }) => {
         const canalLink = global.rcanal || ''
         const bannerUrl = global.banner || ''
 
+        // Detectar si este es un sub-bot o el bot principal
+        const esSubbot = !!global._currentSubbotId
+        const saludoBot = esSubbot
+            ? `👑 Hola, soy *${nombreBot}* — Sub-Bot de Nino Nakano`
+            : `🦋 Hola, soy *${nombreBot}* — Bot Premium de Aarom`''
+
         // Ping / Latencia
         const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
         const p = `${Math.abs(Date.now() - timestamp)}ms`
@@ -26,7 +32,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         const s = Math.floor(uptimeSeconds % 60)
         const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-        // Base de Datos — seguro para usuarios nuevos
+        // Base de Datos segura para usuarios nuevos
         const users = database.data?.users || {}
         const user = users[sender] || {}
         const totalreg = Object.keys(users).length
@@ -49,7 +55,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         }
         const rango = getRango(userLevel)
 
-        // Ranking — seguro aunque no haya usuarios
+        // Ranking seguro
         let rankText = '---'
         try {
             const sortedExp = Object.entries(users).sort((a, b) => (b[1]?.xp || b[1]?.exp || 0) - (a[1]?.xp || a[1]?.exp || 0))
@@ -58,7 +64,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         } catch {}
 
         let txt = `¡Hola, *${username}*! ✨ 
-Es un gusto verte de nuevo. Soy *${nombreBot}* y estoy aquí para ayudarte en lo que necesites. ¡Espero que tengamos un lindo día! 🌸🦋
+${saludoBot}
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
 - Este es un sistema privado creado con mucho cariño por *𝓐𝓪𝓻𝓸𝓶*.
@@ -114,7 +120,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots*
 > *✧･ﾟ: ❏ ${prefix}setnombre <nombre>*
 > *✧･ﾟ: ❏ ${prefix}setbanner [imagen]*
-> *✧･ﾟ: ❏ ${prefix}delsubbot <número>*`.trim()
+> *✧･ﾟ: ❏ ${prefix}delsubbot <número>*`
 
         await conn.sendMessage(m.chat, {
             text: txt,
@@ -134,7 +140,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
     } catch (e) {
         console.error('[MENU ERROR]', e)
         try {
-            await m.reply(`🌸 *Ups...* \nHubo un pequeño problema al mostrar el menú. ¡Pero no te preocupes, Aarom lo solucionará pronto!`)
+            await m.reply('🌸 *Ups...* \nHubo un pequeño problema al mostrar el menú. ¡Pero no te preocupes, Aarom lo solucionará pronto!')
         } catch {}
     }
 }
