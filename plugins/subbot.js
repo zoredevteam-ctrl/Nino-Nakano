@@ -24,7 +24,7 @@ const sendNino = async (conn, m, text) => {
         contextInfo: {
             externalAdReply: {
                 title: global.botName || 'Nino Nakano',
-                body: 'Sistema de Sub-Bots 🤖',
+                body: 'Sistema de Sub-Bots 👑',
                 thumbnailUrl: global.banner || '',
                 sourceUrl: canalLink,
                 mediaType: 1,
@@ -55,7 +55,7 @@ export default {
         if (cmd === 'code' && (text === 'on' || text === 'off')) {
             if (!isOwner) return sendNino(conn, m, '💕 Solo mis dueños pueden habilitar o deshabilitar el #code.')
             cfg.codeEnabled = text === 'on'
-            return sendNino(conn, m, `🤖 El comando *#code* ahora está *${cfg.codeEnabled ? 'ACTIVADO ✅' : 'DESACTIVADO ❌'}*`)
+            return sendNino(conn, m, `🦋 El comando *#code* ahora está *${cfg.codeEnabled ? 'ACTIVADO ✅' : 'DESACTIVADO ❌'}*`)
         }
 
         // ==================== #code (vincular sub-bot) ====================
@@ -73,10 +73,10 @@ export default {
             const numArg = (text || '').replace(/\D/g, '')
             if (!numArg || numArg.length < 8) {
                 return sendNino(conn, m,
-                    `🤖 *VINCULAR SUB-BOT*\n\n` +
+                    `👑 *VINCULAR SUB-BOT*\n\n` +
                     `Para vincular un sub-bot necesito tu número de WhatsApp.\n\n` +
-                    `📌 *Uso:* #code <número>\n` +
-                    `📌 *Ejemplo:* #code 573001234567\n\n` +
+                    `🌸 *Uso:* #code <número>\n` +
+                    `🎀 *Ejemplo:* #code 573001234567\n\n` +
                     `_Incluye el código de país sin el + (ej: 57 para Colombia)_`
                 )
             }
@@ -84,7 +84,7 @@ export default {
             // Verificar si ya tiene un subbot ese número
             const yaExiste = Object.values(subbots).find(s => s.phone === numArg)
             if (yaExiste) {
-                return sendNino(conn, m, `⚠️ El número *+${numArg}* ya tiene un sub-bot registrado.\n\nUsa *#delsubbot ${numArg}* para eliminarlo primero.`)
+                return sendNino(conn, m, `🎀 El número *+${numArg}* ya tiene un sub-bot registrado.\n\nUsa *#delsubbot ${numArg}* para eliminarlo primero.`)
             }
 
             // Generar ID para el subbot
@@ -92,7 +92,7 @@ export default {
 
             // Informar que se está procesando
             await sendNino(conn, m,
-                `🤖 *VINCULANDO SUB-BOT...*\n\n` +
+                `🎀 *VINCULANDO SUB-BOT...*\n\n` +
                 `📱 Número: *+${numArg}*\n` +
                 `🔄 Generando código de 8 dígitos...\n\n` +
                 `_Espera un momento_ 🦋`
