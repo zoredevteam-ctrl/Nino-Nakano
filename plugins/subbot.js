@@ -153,13 +153,13 @@ export default {
 
             if (!lista.length) {
                 return sendNino(conn, m,
-                    `🤖 *SUB-BOTS*\n\n` +
+                    `🦋 *SUB-BOTS*\n\n` +
                     `No hay sub-bots registrados aún.\n\n` +
                     `Usa *#code <número>* para vincular uno.`
                 )
             }
 
-            let txt = `🤖 *LISTA DE SUB-BOTS* (${lista.length}/${MAX_SUBBOTS})\n\n`
+            let txt = `👑 *LISTA DE SUB-BOTS* (${lista.length}/${MAX_SUBBOTS})\n\n`
             lista.forEach((s, i) => {
                 const estado = s.connected ? '🟢 Conectado' : '🔴 Desconectado'
                 txt += `*${i + 1}.* ${s.name || 'SubBot'}\n`
