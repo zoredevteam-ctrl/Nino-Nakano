@@ -366,13 +366,15 @@ export const handler = async (m, conn, plugins) => {
             database.data.users[senderJid].limit -= 1;
         }
 
-        // ===================== EJECUCIÓN ✅ FIX: cmd.run + text + command =====================
+        // ===================== EJECUCION: compatible con cmd.run() y cmd() =====================
         try {
-            await cmd.run(m, {
+            const fn = typeof cmd.run === 'function' ? cmd.run.bind(cmd) : typeof cmd === 'function' ? cmd : null
+            if (!fn) throw new TypeError(`El plugin "${commandName}" no exporta una funcion valida`)
+            await fn(m, {
                 conn,
                 args,
-                text: args.join(' '),   // ✅ para plugins que usan text
-                command: commandName,   // ✅ para plugins que usan command
+                text: args.join(' '),
+                command: commandName,
                 isOwner,
                 isROwner,
                 isPremium,
