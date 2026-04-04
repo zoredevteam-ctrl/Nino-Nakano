@@ -21,22 +21,46 @@ let handler = async (m, { conn, participants, isAdmin, isBotAdmin, isOwner }) =>
         if (isTargetOwner) return m.reply('¡Jamás! 🥰 No podría banear a mi creador ni a sus amigos especiales. Ellos son muy importantes para mí. 🌸✨')
     }
 
+    const sendAsChannel = async (chat, params, extra = {}) => {
+        const newsletterJid = global.channelRD?.id || '0@s.whatsapp.net'
+        const newsletterName = global.channelRD?.name || 'Nino System'
+        
+        params.contextInfo = params.contextInfo || {}
+        params.contextInfo.isForwarded = true
+        params.contextInfo.forwardedNewsletterMessageInfo = {
+            newsletterJid,
+            serverMessageId: '',
+            newsletterName
+        }
+        params.contextInfo.externalAdReply = {
+            title: '🦋 NINO PROTECT SYSTEM 🦋',
+            body: 'Usuario retirado con éxito',
+            mediaType: 1,
+            mediaUrl: 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G',
+            sourceUrl: 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G',
+            thumbnail: await getThumbnailBuffer('https://causas-files.vercel.app/fl/fu5r.jpg').catch(() => null),
+            showAdAttribution: false,
+            containsAutoReply: true,
+            renderLargerThumbnail: false
+        }
+        return conn.sendMessage(chat, params, extra)
+    }
+
+    const getThumbnailBuffer = async (url) => {
+        try {
+            const fetch = (await import('node-fetch')).default
+            const res = await fetch(url)
+            return await res.buffer()
+        } catch (e) {
+            return null
+        }
+    }
+
     try {
         await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
 
-        await conn.sendMessage(m.chat, { 
-            text: `🌸 *AVISO DEL SISTEMA* 🌸\n\nSe ha decidido que el usuario ya no forme parte de nuestro grupo. ¡Espero que todo mejore a partir de ahora! 🥰✨`,
-            contextInfo: {
-                externalAdReply: {
-                    title: '🦋 NINO PROTECT SYSTEM 🦋',
-                    body: 'Usuario retirado con éxito',
-                    description: 'Usuario sacado del grupo',
-                    thumbnailUrl: 'https://causas-files.vercel.app/fl/fu5r.jpg',
-                    sourceUrl: 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G',
-                    mediaType: 1,
-                    renderLargerThumbnail: true
-                }
-            }
+        await sendAsChannel(m.chat, { 
+            text: `🌸 *AVISO DEL SISTEMA* 🌸\n\nSe ha decidido que el usuario ya no forme parte de nuestro grupo. ¡Espero que todo mejore a partir de ahora! 🥰✨`
         }, { quoted: m })
 
     } catch (e) {
