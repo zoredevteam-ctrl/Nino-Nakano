@@ -43,6 +43,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         const userMoney = user.limit ?? 0
         const userExp = user.xp ?? user.exp ?? 0
         const userLevel = user.level ?? 1
+        const rpg = user.rpg || null
 
         // Sub-bots activos
         const subbots = database.data?.subbots || {}
@@ -87,6 +88,7 @@ let handler = async (m, { conn, usedPrefix }) => {
 *|✎ Rango:* ${rango}
 *|✎ Nivel:* ${userLevel}
 *|✎ Ranking:* ${rankText}
+${rpg?.clase ? `*|✎ Clase RPG:* ${rpg.clase} Nv.${rpg.nivel} ⚔️` : '*|✎ RPG:* Sin clase — usa #elegirclase'}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
 *╭╼𝅄꒰👑꒱ 𐔌 SUB-BOTS 𐦯*
@@ -102,6 +104,8 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}ping*
 > *✧･ﾟ: ❏ ${prefix}update*
 > *✧･ﾟ: ❏ ${prefix}owner*
+> *✧･ﾟ: ❏ ${prefix}restart*
+> *✧･ﾟ: ❏ ${prefix}setprefix / ${prefix}delprefix*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 GRUPOS 𐦯*
 > *✧･ﾟ: ❏ ${prefix}kick*
@@ -109,28 +113,39 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}promover / ${prefix}degradar*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 𐦯*
-> *✧･ﾟ: ❏ ${prefix}daily*
-> *✧･ﾟ: ❏ ${prefix}cofre*
-> *✧･ﾟ: ❏ ${prefix}minar*
-> *✧･ﾟ: ❏ ${prefix}work / ${prefix}chamba*
-> *✧･ﾟ: ❏ ${prefix}crime*
-> *✧･ﾟ: ❏ ${prefix}rob / ${prefix}rob2*
+> *✧･ﾟ: ❏ ${prefix}daily / ${prefix}cofre*
+> *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work*
+> *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob*
 > *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
-> *✧･ﾟ: ❏ ${prefix}shop*
+> *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG ⚔️*
+> *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
+> *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
+> *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
+> *✧･ﾟ: ❏ ${prefix}curar / ${prefix}inventario*
+> *✧･ﾟ: ❏ ${prefix}pelear / ${prefix}tiendarpg*
+> *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones*
+> *✧･ﾟ: ❏ ${prefix}rpgtop*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 🎵*
+> *✧･ﾟ: ❏ ${prefix}play <canción>*
+> *✧･ﾟ: ❏ ${prefix}playvid <canción>*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🎨*
+> *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 🤖*
 > *✧･ﾟ: ❏ ${prefix}code <número>*
-> *✧･ﾟ: ❏ ${prefix}subbots*
-> *✧･ﾟ: ❏ ${prefix}setnombre <nombre>*
-> *✧･ﾟ: ❏ ${prefix}setbanner [imagen]*
-> *✧･ﾟ: ❏ ${prefix}delsubbot <número>*`
+> *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
+> *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
         await conn.sendMessage(m.chat, {
             text: txt,
             contextInfo: {
                 externalAdReply: {
                     title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
-                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de 𝓐𝓪𝓻𝓸𝓶',
+                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de Aarom',
                     thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
                     mediaType: 1,
