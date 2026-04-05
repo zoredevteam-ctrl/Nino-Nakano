@@ -22,6 +22,12 @@ const sendNino = async (conn, m, text) => {
     return conn.sendMessage(m.chat, {
         text,
         contextInfo: {
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                serverMessageId: '',
+                newsletterName: global.newsletterName || 'Nino Nakano'
+            },
             externalAdReply: {
                 title: global.botName || 'Nino Nakano',
                 body: 'Sistema de Sub-Bots 🤖',
