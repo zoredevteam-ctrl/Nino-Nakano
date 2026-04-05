@@ -253,7 +253,7 @@ let handler = async (m, { conn, command, text, args, db }) => {
                 `✨ XP: +${xpGanada}\n` +
                 `💰 Gold: +${goldGanado}\n` +
                 `❤️ HP restante: ${rpg.hp}/${rpg.maxHp}\n` +
-                `${subioNivel ? `\n🎉 *¡SUBISTE AL NIVEL ${rpg.nivel}!*\n⬆️ Stats mejorados` : ''}\n\n` +
+                (subioNivel ? `\n🎉 *¡SUBISTE AL NIVEL ${rpg.nivel}!*\n⬆️ Stats mejorados\n` : '') +
                 `_Vuelve en 30 minutos para otra exploración_`
             )
         } else {
@@ -491,4 +491,4 @@ let handler = async (m, { conn, command, text, args, db }) => {
                     mediaType: 1
                 }
             }
-        }
+        }, { q
