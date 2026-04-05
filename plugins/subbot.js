@@ -24,7 +24,7 @@ const sendNino = async (conn, m, text) => {
         contextInfo: {
             externalAdReply: {
                 title: global.botName || 'Nino Nakano',
-                body: 'Sistema de Sub-Bots 🎀',
+                body: 'Sistema de Sub-Bots 🦋',
                 thumbnailUrl: global.banner || '',
                 sourceUrl: canalLink,
                 mediaType: 1,
@@ -73,10 +73,10 @@ export default {
             const numArg = (text || '').replace(/\D/g, '')
             if (!numArg || numArg.length < 8) {
                 return sendNino(conn, m,
-                    `🎀 *VINCULAR SUB-BOT*\n\n` +
+                    `👑 *VINCULAR SUB-BOT*\n\n` +
                     `Para vincular un sub-bot necesito tu número de WhatsApp.\n\n` +
-                    `👑 *Uso:* #code <número>\n` +
-                    `🦋 *Ejemplo:* #code 573001234567\n\n` +
+                    `🎀 *Uso:* #code <número>\n` +
+                    `🎀 *Ejemplo:* #code 573001234567\n\n` +
                     `_Incluye el código de país sin el + (ej: 57 para Colombia)_`
                 )
             }
@@ -84,7 +84,7 @@ export default {
             // Verificar si ya tiene un subbot ese número
             const yaExiste = Object.values(subbots).find(s => s.phone === numArg)
             if (yaExiste) {
-                return sendNino(conn, m, `🦋 El número *+${numArg}* ya tiene un sub-bot registrado.\n\nUsa *#delsubbot ${numArg}* para eliminarlo primero.`)
+                return sendNino(conn, m, `🎀 El número *+${numArg}* ya tiene un sub-bot registrado.\n\nUsa *#delsubbot ${numArg}* para eliminarlo primero.`)
             }
 
             // Generar ID para el subbot
@@ -117,27 +117,23 @@ export default {
                     createdAt: Date.now()
                 }
 
-                // Enviar instrucciones en mensaje separado
+                // Mensaje con instrucciones
                 await conn.sendMessage(m.chat, {
                     text:
-                        `📲 *MÉTODO DE VINCULACIÓN*\n\n` +
-                        `1. Abre WhatsApp en el número *+${numArg}*\n` +
-                        `2. Ve a ⚙️ *Ajustes → Dispositivos Vinculados*\n` +
+                        `🎀 *VINCULAR SUB-BOT*\n\n` +
+                        `📲 *Cómo hacerlo:*\n` +
+                        `1. Abre WhatsApp en *+${numArg}*\n` +
+                        `2. Ve a ⚙️ Ajustes → Dispositivos Vinculados\n` +
                         `3. Toca *Vincular un dispositivo*\n` +
                         `4. Selecciona *Vincular con número de teléfono*\n` +
-                        `5. Ingresa el código que te enviaré a continuación 👇`
+                        `5. Copia y pega el código del siguiente mensaje 👇\n\n` +
+                        `⏱️ _El código expira en 60 segundos_`
                 }, { quoted: m })
 
-                // Enviar el código en mensaje separado
+                // Mensaje solo con el código para copiar y pegar fácil
                 await conn.sendMessage(m.chat, {
-                    text:
-                        `🔑 *CÓDIGO DE VINCULACIÓN*\n\n` +
-                        `┌─────────────────┐\n` +
-                        `│  *${result.code}*  │\n` +
-                        `└─────────────────┘\n\n` +
-                        `⏱️ _Este código expira en 60 segundos_\n` +
-                        `📱 Número: *+${numArg}*`
-                }, { quoted: m })
+                    text: result.code
+                })
 
             } catch (e) {
                 console.error('[SUBBOT CODE ERROR]', e)
@@ -153,13 +149,13 @@ export default {
 
             if (!lista.length) {
                 return sendNino(conn, m,
-                    `👑 *SUB-BOTS*\n\n` +
+                    `🎀 *SUB-BOTS*\n\n` +
                     `No hay sub-bots registrados aún.\n\n` +
                     `Usa *#code <número>* para vincular uno.`
                 )
             }
 
-            let txt = `🎀 *LISTA DE SUB-BOTS* (${lista.length}/${MAX_SUBBOTS})\n\n`
+            let txt = `👑 *LISTA DE SUB-BOTS* (${lista.length}/${MAX_SUBBOTS})\n\n`
             lista.forEach((s, i) => {
                 const estado = s.connected ? '🟢 Conectado' : '🔴 Desconectado'
                 txt += `*${i + 1}.* ${s.name || 'SubBot'}\n`
