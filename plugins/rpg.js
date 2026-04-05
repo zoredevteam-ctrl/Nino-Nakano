@@ -11,6 +11,12 @@ const RCANAL = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y'
 const sendNino = (conn, m, text) => conn.sendMessage(m.chat, {
     text,
     contextInfo: {
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+            serverMessageId: '',
+            newsletterName: global.newsletterName || 'Nino Nakano'
+        },
         externalAdReply: {
             title: `⚔️ ${global.botName || 'Nino Nakano'} RPG`,
             body: 'Sistema de Aventuras 🗡️',
@@ -485,11 +491,4 @@ let handler = async (m, { conn, command, text, args, db }) => {
                     mediaType: 1
                 }
             }
-        }, { quoted: m })
-    }
-}
-
-handler.command = ['perfil', 'rpg', 'clases', 'elegirclase', 'dungeon', 'explorar',
-                   'atacar', 'habilidad', 'skill', 'curar', 'heal',
-                   'inventario', 'inv', 'usar', 'rpgtop']
-export default handler
+        }
