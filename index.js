@@ -240,6 +240,10 @@ async function startBot() {
   // ✅ Cargar base de datos primero
   await database.read()
 
+  // ✅ Restaurar prefijo y banner guardados si existen
+  if (database.data?.settings?.prefix) global.prefix = database.data.settings.prefix
+  if (database.data?.settings?.banner) global.banner = database.data.settings.banner
+
   await loadPlugins()
   global.plugins = plugins
   await startBot()
