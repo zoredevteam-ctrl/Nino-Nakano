@@ -47,18 +47,22 @@ let handler = async (m, { conn, command, text }) => {
         // 1. Buscar en YouTube
         const searchRes = await apiGet(`${API}/search/youtube?apikey=${APIKEY}&query=${encodeURIComponent(query)}`)
 
-        if (!searchRes?.result?.[0]) {
+        // Manejar distintas estructuras de respuesta
+        const results = searchRes?.result || searchRes?.results || searchRes?.data || []
+        if (!results.length) {
             await m.react('❌')
             return sendNino(conn, m, `❌ No encontré resultados para *${query}*\n\nIntenta con otro nombre 🦋`)
         }
 
-        const song = searchRes.result[0]
-        const title     = song.title     || 'Sin título'
-        const duration  = song.duration  || 'N/A'
-        const views     = song.views     || 'N/A'
-        const channel   = song.channel   || 'N/A'
-        const thumb     = song.thumbnail || ''
-        const videoUrl  = song.url       || song.link || ''
+        const song = results[0]
+        const title    = song.title     || song.name        || 'Sin título'
+        const duration = song.duration  || song.length      || 'N/A'
+        const views    = song.views     || song.viewCount   || 'N/A'
+        const channel  = song.channel   || song.author      || song.uploader || 'N/A'
+        const thumb    = song.thumbnail || song.thumbnailUrl || song.image || ''
+        const videoUrl = song.url       || song.link        || song.videoUrl  || song.id
+            ? (song.url || song.link || song.videoUrl || `https://youtube.com/watch?v=${song.id}`)
+            : ''
 
         if (!videoUrl) {
             await m.react('❌')
@@ -67,27 +71,26 @@ let handler = async (m, { conn, command, text }) => {
 
         await m.react('⬇️')
 
-        // 2. Descargar audio o video
-        let dlRes
-        if (isVideo) {
-            dlRes = await apiGet(`${API}/download/savetubemp4?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
-        } else {
-            dlRes = await apiGet(`${API}/download/savetubemp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
+        // 2. Descargar — probar varios servidores en orden
+        let finalUrl = null
+
+        const servidores = isVideo
+            ? ['savetubemp4', 'ytmp4', 'ytvideo', 'ytv']
+            : ['savetubemp3', 'ytmp3', 'ytaudio', 'yta', 'dlmp3']
+
+        for (const srv of servidores) {
+            try {
+                const dlRes = await apiGet(`${API}/download/${srv}?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
+                const url = dlRes?.result?.downloadUrl || dlRes?.result?.url || dlRes?.result?.audio
+                    || dlRes?.result?.video || dlRes?.download_url || dlRes?.url || dlRes?.link
+                if (url) { finalUrl = url; break }
+            } catch { continue }
         }
 
-        const dlUrl = dlRes?.result?.downloadUrl || dlRes?.result?.url || dlRes?.download_url || dlRes?.url
-
-        if (!dlUrl) {
-            // Intentar con servidor alternativo
-            const dlRes2 = await apiGet(`${API}/download/ytmp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
-            const dlUrl2 = dlRes2?.result?.downloadUrl || dlRes2?.result?.url || dlRes2?.download_url
-            if (!dlUrl2) {
-                await m.react('❌')
-                return sendNino(conn, m, `❌ No pude descargar *${title}*.\n\nIntenta de nuevo en unos segundos 🦋`)
-            }
-        }
-
-        const finalUrl = dlUrl || ''
+        if (!finalUrl) {
+            await m.react('❌')
+            return sendNino(conn, m, `❌ No pude descargar *${title}*.\n\nIntenta de nuevo en unos segundos 🦋`)
+        }''
 
         // 3. Descargar el buffer
         const mediaRes = await fetch(finalUrl)
