@@ -41,7 +41,6 @@ const getThumbnail = async () => {
 
 const buildContext = (thumbnail) => {
     const newsletterJid = global.newsletterJid || '120363408182996815@newsletter'
-    }
     return {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
