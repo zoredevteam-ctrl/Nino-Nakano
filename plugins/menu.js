@@ -1,10 +1,5 @@
 import { database } from '../lib/database.js'
 
-/**
- * Menú Principal - Nino Nakano
- * Corregido: rcanal desde global, usuarios nuevos seguros
- */
-
 let handler = async (m, { conn, usedPrefix }) => {
     try {
         const sender = m.sender
@@ -14,11 +9,11 @@ let handler = async (m, { conn, usedPrefix }) => {
         const canalLink = global.rcanal || ''
         const bannerUrl = global.banner || ''
 
-        // Detectar si este es un sub-bot o el bot principal
+        // Detectar si es sub-bot o bot principal
         const esSubbot = !!global._currentSubbotId
         const saludoBot = esSubbot
-            ? `👑 Hola, soy *${nombreBot}* — Sub-Bot de Nino Nakano`
-            : `🦋 Hola, soy *${nombreBot}* — Bot Premium de Aarom`''
+            ? `🤖 Hola, soy *${nombreBot}* — Sub-Bot de Nino Nakano`
+            : `💎 Hola, soy *${nombreBot}* — Bot Premium de Aarom`
 
         // Ping / Latencia
         const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
@@ -63,7 +58,8 @@ let handler = async (m, { conn, usedPrefix }) => {
             rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : '---'
         } catch {}
 
-        let txt = `¡Hola, *${username}*! ✨ 
+        const txt =
+`¡Hola, *${username}*! ✨
 ${saludoBot}
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
