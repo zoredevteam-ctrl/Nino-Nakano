@@ -31,7 +31,7 @@ global.prefix = '#'
 // ENLACES Y VISUALES 🎀
 // ————————————————————————————————————————————————————————————————————
 
-global.rcanal = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y'
+global.rcanal = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 global.banner = 'https://causas-files.vercel.app/fl/cyns.png' 
 
 // ————————————————————————————————————————————————————————————————————
