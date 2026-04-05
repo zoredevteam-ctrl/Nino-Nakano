@@ -9,11 +9,19 @@ let handler = async (m, { conn, usedPrefix }) => {
         const canalLink = global.rcanal || ''
         const bannerUrl = global.banner || ''
 
+        // Saludo según hora
+        const hora = new Date().getHours()
+        let saludo
+        if (hora >= 5 && hora < 12)       saludo = 'Buenos días ☀️'
+        else if (hora >= 12 && hora < 18) saludo = 'Buenas tardes 🌸'
+        else if (hora >= 18 && hora < 22) saludo = 'Buenas noches 🌙'
+        else                               saludo = 'Te veo de nuevo 🦋'
+
         // Detectar si es sub-bot o bot principal
         const esSubbot = !!global._currentSubbotId
         const saludoBot = esSubbot
-            ? `🤖 Hola, soy *${nombreBot}* — Sub-Bot de Nino Nakano`
-            : `💎 Hola, soy *${nombreBot}* — Bot Premium de Aarom`
+            ? `🤖 Hola *${username}*! Soy *${nombreBot}*, tu Sub-Bot de confianza~\n${saludo}, espero disfrutes todos mis comandos 💕`
+            : `💎 Hola *${username}*! Soy *${nombreBot}* Premium Bot~\n${saludo}, espero disfrutes mis nuevos comandos 🌸`
 
         // Ping / Latencia
         const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
@@ -59,8 +67,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         } catch {}
 
         const txt =
-`¡Hola, *${username}*! ✨
-${saludoBot}
+`${saludoBot}
 
 > ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
 - Este es un sistema privado creado con mucho cariño por *𝓐𝓪𝓻𝓸𝓶*.
@@ -122,8 +129,8 @@ _Aquí tienes todo lo que puedo hacer por ti:_
             text: txt,
             contextInfo: {
                 externalAdReply: {
-                    title: `🌸 ${nombreBot.toUpperCase()} 🌸`,
-                    body: 'Panel de Control de Aarom',
+                    title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
+                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de 𝓐𝓪𝓻𝓸𝓶',
                     thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
                     mediaType: 1,
