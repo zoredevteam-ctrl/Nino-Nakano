@@ -5,7 +5,7 @@
  */
 
 const API = 'https://api.giftedtech.co.ke/api'
-const APIKEY = 'gifted'
+const APIKEY = 'Fedex'
 
 const sendNino = async (conn, m, text) => conn.sendMessage(m.chat, {
     text,
@@ -70,16 +70,16 @@ let handler = async (m, { conn, command, text }) => {
         // 2. Descargar audio o video
         let dlRes
         if (isVideo) {
-            dlRes = await apiGet(`${API}/download/ytmp4?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
+            dlRes = await apiGet(`${API}/download/savetubemp4?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
         } else {
-            dlRes = await apiGet(`${API}/download/ytmp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
+            dlRes = await apiGet(`${API}/download/savetubemp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
         }
 
         const dlUrl = dlRes?.result?.downloadUrl || dlRes?.result?.url || dlRes?.download_url || dlRes?.url
 
         if (!dlUrl) {
             // Intentar con servidor alternativo
-            const dlRes2 = await apiGet(`${API}/download/dlmp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
+            const dlRes2 = await apiGet(`${API}/download/ytmp3?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
             const dlUrl2 = dlRes2?.result?.downloadUrl || dlRes2?.result?.url || dlRes2?.download_url
             if (!dlUrl2) {
                 await m.react('❌')
