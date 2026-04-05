@@ -40,9 +40,7 @@ const getThumbnail = async () => {
 }
 
 const buildContext = (thumbnail) => {
-    let newsletterJid = '0@s.whatsapp.net'
-    if (global.rcanal && global.rcanal.includes('/channel/')) {
-        newsletterJid = global.rcanal.split('/channel/')[1] + '@newsletter'
+    const newsletterJid = global.newsletterJid || '120363408182996815@newsletter'
     }
     return {
         isForwarded: true,
