@@ -25,10 +25,7 @@ const getThumbnail = async () => {
 
 const sendTool = async (conn, m, text) => {
     const thumbnail = await getThumbnail()
-    let newsletterJid = '0@s.whatsapp.net'
-    if (global.rcanal?.includes('/channel/')) {
-        newsletterJid = global.rcanal.split('/channel/')[1] + '@newsletter'
-    }
+    const newsletterJid = global.newsletterJid || '120363408182996815@newsletter'
     return conn.sendMessage(m.chat, {
         text,
         contextInfo: {
@@ -452,4 +449,8 @@ let handler = async (m, { conn, command, text, args }) => {
             return sendTool(conn, m,
                 `🔡 *HEX ${modo.toUpperCase()}*\n\n` +
                 `📝 Input: \`${contenido.slice(0, 100)}\`\n` +
-     
+                `✅ Output:\n\`\`\`${result}\`\`\``
+            )
+        }
+
+        // =========
