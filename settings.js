@@ -7,23 +7,18 @@ import { fileURLToPath } from 'url'
 // ————————————————————————————————————————————————————————————————————
 
 global.botName = 'Nino Nakano'
-global.ownerName = '𝓐𝓪𝓻𝓸𝓶 𝓞𝔀𝓷𝓮𝓻 🦋' // Todo el crédito para ti
+global.ownerName = '𝓐𝓪𝓻𝓸𝓶 𝓞𝔀𝓷𝓮𝓻 🦋'
 global.botVersion = '1.0.5'
 
-/**
- * LISTA DE DUEÑOS AUTORIZADOS 👑
- * Solo tú y Félix. Nadie más tiene permiso para tocar mis archivos.
- */
 global.owner = [
   ['573107400303', 'Aarom 🦋', true],
   ['573508941325', 'Félix ⚡', true],
-  ['123613520896125', 'Aarom LID 🦋', true]   // ← Tu dispositivo vinculado (LID)
+  ['123613520896125', 'Aarom LID 🦋', true]
 ]
 
-// Generación automática de arrays para el sistema
-global.owners = global.owner.map(v => v[0]) 
-global.mods = [] 
-global.prems = [] 
+global.owners = global.owner.map(v => v[0])
+global.mods = []
+global.prems = []
 
 global.prefix = '#'
 
@@ -32,7 +27,47 @@ global.prefix = '#'
 // ————————————————————————————————————————————————————————————————————
 
 global.rcanal = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
-global.banner = 'https://causas-files.vercel.app/fl/cyns.png' 
+
+// ✅ JID real del newsletter para que aparezca el botón de seguir
+global.newsletterJid = '120363408182996815@newsletter'
+global.newsletterName = '𓆩 ✧ 𝐍𝐢𝐧𝐨 ⌁ 𝑼𝒑𝒅𝒂𝒕𝒆𝒔 ✧ 𓆪'
+
+global.banner = 'https://causas-files.vercel.app/fl/cyns.png'
+
+// ————————————————————————————————————————————————————————————————————
+// FUNCIÓN GLOBAL PARA NEWSLETTER CONTEXT 🦋
+// Úsala en cualquier plugin con: global.getNewsletterCtx(thumbnail, title, body)
+// ————————————————————————————————————————————————————————————————————
+
+global.getNewsletterCtx = (thumbnail = null, title = null, body = null) => {
+    return {
+        isForwarded: true,
+        forwardedNewsletterMessageInfo: {
+            newsletterJid: global.newsletterJid,
+            serverMessageId: '',
+            newsletterName: global.newsletterName
+        },
+        externalAdReply: {
+            title: title || `🌸 ${global.botName}`,
+            body: body || 'Nino Nakano Bot 🦋',
+            mediaType: 1,
+            mediaUrl: global.rcanal,
+            sourceUrl: global.rcanal,
+            thumbnail,
+            showAdAttribution: false,
+            containsAutoReply: true,
+            renderLargerThumbnail: false
+        }
+    }
+}
+
+// Función helper para obtener thumbnail del banner
+global.getBannerThumb = async () => {
+    try {
+        const res = await fetch(global.banner)
+        return Buffer.from(await res.arrayBuffer())
+    } catch { return null }
+}
 
 // ————————————————————————————————————————————————————————————————————
 // MENSAJES DE SISTEMA (Estilo Tsundere 🦋)
@@ -58,11 +93,9 @@ const file = fileURLToPath(import.meta.url)
 
 fs.watchFile(file, async () => {
     try {
-        fs.unwatchFile(file) // Evita acumular procesos en memoria
+        fs.unwatchFile(file)
         console.log(chalk.magentaBright('\n🦋 [SETTINGS]: Cambios guardados. Solo Aarom y Félix tienen el control ahora.'))
-
-        // Importación dinámica con timestamp para evitar la caché de ESM y actualizar las variables reales
-        await import(`\( {file}?update= \){Date.now()}`)
+        await import(`${file}?update=${Date.now()}`)
     } catch (e) {
         console.error(chalk.red('[!] Error en auto-reload:'), e)
     }
