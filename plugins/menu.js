@@ -114,19 +114,42 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}daily / ${prefix}cofre*
-> *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work*
-> *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob*
+> *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work / ${prefix}chamba*
+> *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob / ${prefix}rob2*
 > *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
 > *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar*
+> *✧･ﾟ: ❏ ${prefix}lvl*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG 𐦯*
 > *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
 > *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
 > *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
-> *✧･ﾟ: ❏ ${prefix}curar / ${prefix}inventario*
+> *✧･ﾟ: ❏ ${prefix}curar / ${prefix}inventario / ${prefix}usar*
 > *✧･ﾟ: ❏ ${prefix}pelear / ${prefix}tiendarpg*
-> *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones*
+> *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones / ${prefix}reclamar*
 > *✧･ﾟ: ❏ ${prefix}rpgtop*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}clima <ciudad>*
+> *✧･ﾟ: ❏ ${prefix}traducir <idioma> <texto>*
+> *✧･ﾟ: ❏ ${prefix}calc <operación>*
+> *✧･ﾟ: ❏ ${prefix}qr <texto>*
+> *✧･ﾟ: ❏ ${prefix}acortar <url>*
+> *✧･ﾟ: ❏ ${prefix}ip <dirección>*
+> *✧･ﾟ: ❏ ${prefix}color <hex>*
+> *✧･ﾟ: ❏ ${prefix}moneda <cant> <de> <a>*
+> *✧･ﾟ: ❏ ${prefix}dado / ${prefix}cara*
+> *✧･ﾟ: ❏ ${prefix}wiki <tema>*
+> *✧･ﾟ: ❏ ${prefix}letra <canción>*
+> *✧･ﾟ: ❏ ${prefix}password <longitud>*
+> *✧･ﾟ: ❏ ${prefix}base64 encode/decode*
+> *✧･ﾟ: ❏ ${prefix}binario encode/decode*
+> *✧･ﾟ: ❏ ${prefix}hex encode/decode*
+> *✧･ﾟ: ❏ ${prefix}timestamp*
+> *✧･ﾟ: ❏ ${prefix}checkurl <url>*
+> *✧･ﾟ: ❏ ${prefix}ascii <texto>*
+> *✧･ﾟ: ❏ ${prefix}pokedex <nombre>*
+> *✧･ﾟ: ❏ ${prefix}chiste / ${prefix}frase*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}play <canción>*
