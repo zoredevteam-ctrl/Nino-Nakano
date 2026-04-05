@@ -119,7 +119,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
 > *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG ⚔️*
 > *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
 > *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
 > *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
@@ -128,14 +128,14 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones*
 > *✧･ﾟ: ❏ ${prefix}rpgtop*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 🎵*
 > *✧･ﾟ: ❏ ${prefix}play <canción>*
 > *✧･ﾟ: ❏ ${prefix}playvid <canción>*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🎨*
 > *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 🤖*
 > *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
@@ -143,9 +143,15 @@ _Aquí tienes todo lo que puedo hacer por ti:_
         await conn.sendMessage(m.chat, {
             text: txt,
             contextInfo: {
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    serverMessageId: '',
+                    newsletterName: global.newsletterName || 'Nino Nakano'
+                },
                 externalAdReply: {
                     title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
-                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de 𝓐𝓪𝓻𝓸𝓶',
+                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de Aarom',
                     thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
                     mediaType: 1,
