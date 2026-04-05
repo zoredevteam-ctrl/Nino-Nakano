@@ -128,14 +128,14 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones*
 > *✧･ﾟ: ❏ ${prefix}rpgtop*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 🎵*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA ✨*
 > *✧･ﾟ: ❏ ${prefix}play <canción>*
 > *✧･ﾟ: ❏ ${prefix}playvid <canción>*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🎨*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🌟*
 > *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 🤖*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 💫*
 > *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
