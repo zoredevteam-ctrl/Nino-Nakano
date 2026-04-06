@@ -32,7 +32,7 @@ global.rcanal = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 global.newsletterJid = '120363408182996815@newsletter'
 global.newsletterName = '𓆩 ✧ 𝐍𝐢𝐧𝐨 ⌁ 𝑼𝒑𝒅𝒂𝒕𝒆𝒔 ✧ 𓆪'
 
-global.banner = 'https://causas-files.vercel.app/fl/cyns.png'
+global.banner = 'https://causas-files.vercel.app/fl/k7uk.jpg'
 
 // ————————————————————————————————————————————————————————————————————
 // FUNCIÓN GLOBAL PARA NEWSLETTER CONTEXT 🦋
