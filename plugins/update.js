@@ -35,7 +35,7 @@ const sendUpdate = async (conn, m, text) => {
 }
 
 let handler = async (m, { conn, isOwner }) => {
-    if (!isOwner) return m.reply('¡Lo siento mucho! 🥺 Solo Aarom puede usar esto. ¡No te enojes! 💕')
+    if (!isOwner) return m.reply('¡Lo siento mucho! 🎀 Solo mi creador puede usar esto. ¡No te enojes! ✨')
 
     await sendUpdate(conn, m, '🔍 Revisando actualizaciones... Dame un segundo 🦋')
 
@@ -43,7 +43,7 @@ let handler = async (m, { conn, isOwner }) => {
         if (err) {
             console.error(chalk.red('[ERROR UPDATE]:'), err)
             return sendUpdate(conn, m,
-                `❌ *¡ERROR AL ACTUALIZAR!* 😭\n\n` +
+                `❌ *¡ERROR AL ACTUALIZAR!* 🎀\n\n` +
                 `\`\`\`${err.message.slice(0, 300)}\`\`\``
             )
         }
@@ -52,7 +52,7 @@ let handler = async (m, { conn, isOwner }) => {
         if (stdout.includes('Already up to date')) {
             return sendUpdate(conn, m,
                 `✅ *¡Ya estoy al día!* 🌸\n\n` +
-                `No hay cambios nuevos, sigo siendo tu mejor versión 🥰\n\n` +
+                `No hay cambios nuevos, sigo siendo tu mejor versión 👑\n\n` +
                 `_Si quieres reiniciar igual usa *#restart*_ 🦋`
             )
         }
