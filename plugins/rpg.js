@@ -37,7 +37,8 @@ const CLASES = {
     mago:      { emoji: '🔮',  hp: 120, atk: 40, def: 10, sp: 20, habilidad: 'Bola de Fuego',   desc: 'Alto daño mágico' },
     arquero:   { emoji: '🏹',  hp: 140, atk: 30, def: 15, sp: 25, habilidad: 'Flecha Certera',  desc: 'Velocidad y precisión' },
     asesino:   { emoji: '🗡️', hp: 130, atk: 35, def: 12, sp: 30, habilidad: 'Golpe Crítico',   desc: 'Daño crítico alto' },
-    sacerdote: { emoji: '✨',  hp: 150, atk: 15, def: 18, sp: 15, habilidad: 'Curación Divina', desc: 'Soporte y curación' }
+    sacerdote: { emoji: '✨',  hp: 150, atk: 15, def: 18, sp: 15, habilidad: 'Curación Divina', desc: 'Soporte y curación' },
+    gotica:    { emoji: '🖤',  hp: 160, atk: 20, def: 15, sp: 35, habilidad: 'Pedo Maldito',    desc: 'Daño por gas toxico' }
 }
 
 const DUNGEONS = [
@@ -365,6 +366,12 @@ let handler = async (m, { conn, command, text, args, db }) => {
             const dano = critico ? randInt(rpg.atk * 3, rpg.atk * 5) : randInt(rpg.atk, rpg.atk * 2)
             xpBonus = 45; goldBonus = 35
             resultado = `🗡️ *Golpe Crítico* ${critico ? '⚡ CRÍTICO!' : ''} causa *${dano}* de daño a ${enemigo.emoji} ${enemigo.nombre}!`
+        } else if (rpg.clase === 'gotica') {
+            const victimas = randInt(1, 5)
+            const dano = randInt(rpg.sp * 2, rpg.sp * 4)
+            rpg.hp = Math.min(rpg.maxHp, rpg.hp + 10) // el peo también cura un poco jaja
+            xpBonus = 55; goldBonus = 40
+            resultado = `🖤💨 *Pedo Maldito* — lanzaste un gas tóxico de nivel ${rpg.nivel} que afecta a *${victimas} enemigos* causando *${dano}* de daño total\n\n_Los enemigos huyeron despavoridos... y tú también casi_ 💀\n❤️ HP: +10 (efecto secundario del gas)`
         } else if (rpg.clase === 'sacerdote') {
             const cura = randInt(30, 80)
             rpg.hp = Math.min(rpg.maxHp, rpg.hp + cura)
@@ -473,22 +480,4 @@ let handler = async (m, { conn, command, text, args, db }) => {
 
         if (!top.length) return sendNino(conn, m, `⚔️ Nadie ha empezado su aventura aún.`)
 
-        let txt = `🏆 *TOP RPG*\n\n`
-        top.forEach((p, i) => {
-            const u = db.users[p.jid]
-            txt += `${i + 1}. @${p.jid.split('@')[0]} — Nv.${p.nivel} | 🏆${p.victorias} victorias\n`
-        })
-
-        return conn.sendMessage(m.chat, {
-            text: txt,
-            mentions: top.map(p => p.jid),
-            contextInfo: {
-                externalAdReply: {
-                    title: `🏆 RPG TOP`,
-                    body: `${global.botName || 'Nino Nakano'} RPG`,
-                    thumbnailUrl: global.banner || '',
-                    sourceUrl: global.rcanal || RCANAL,
-                    mediaType: 1
-                }
-            }
-        }, { q
+        let txt = `🏆 
