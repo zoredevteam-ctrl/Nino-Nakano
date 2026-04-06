@@ -1,15 +1,8 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-const getThumbnailBuffer = async (url) => {
+const getThumbnail = async () => {
     try {
-        const res = await (await import('node-fetch')).default(url)
-        return await res.buffer()
-    } catch {
-        return null
-    }
+        const res = await fetch(global.banner || 'https://causas-files.vercel.app/fl/fu5r.jpg')
+        return Buffer.from(await res.arrayBuffer())
+    } catch { return null }
 }
 
 export default {
@@ -23,14 +16,11 @@ export default {
     async run(m, { conn, who, isOwner }) {
         let user = who || m.quoted?.sender || m.mentionedJid?.[0]
 
-        if (!user) {
-            return m.reply(isOwner 
-                ? `💕 Mi amor, dime a quién quieres promover 🥺\nEjemplo: *#promote @usuario* o responde a su mensaje`
-                : `💕 ¿A quién quieres promover? Menciona o responde a su mensaje.`
-            )
-        }
+        if (!user) return m.reply(isOwner
+            ? `💕 Mi amor, dime a quién quieres promover 🥺\nEjemplo: *#promote @usuario* o responde a su mensaje`
+            : `💕 ¿A quién quieres promover? Menciona o responde a su mensaje.`
+        )
 
-        // Normalizar LID si es necesario
         if (user.endsWith('@lid') && m.isGroup) {
             try {
                 const meta = await conn.groupMetadata(m.chat)
@@ -42,51 +32,48 @@ export default {
         const meta = await conn.groupMetadata(m.chat)
         const participant = meta.participants.find(p => p.id === user || p.jid === user)
 
-        if (!participant) return m.reply(isOwner ? `💕 Mi cielo, esa persona no está en el grupo 🥺` : `💕 Esa persona no está en el grupo.`)
+        if (!participant) return m.reply(`💕 Esa persona no está en el grupo.`)
+        if (participant.admin) return m.reply(`💕 Esa persona ya es administrador.`)
 
-        if (participant.admin) return m.reply(isOwner ? `💕 Mi amor, ya es administrador 💕` : `💕 Esa persona ya es admin.`)
+        await conn.groupParticipantsUpdate(m.chat, [user], 'promote')
 
-        await conn.groupParticipantsUpdate(m.chat, [user], "promote")
+        // Nombre del que ejecutó el comando
+        const promotorNombre = m.pushName || m.sender.split('@')[0]
+        const promotorTag = `@${m.sender.split('@')[0]}`
+        const usuarioTag = `@${user.split('@')[0]}`
+        const grupoNombre = meta.subject || 'este reino'
 
-        const sendAsChannel = async (text) => {
-            const bannerUrl = global.banner || 'https://qu.ax/zRNgk.jpg'
-            const thumbnail = await getThumbnailBuffer(bannerUrl).catch(() => null)
+        const thumbnail = await getThumbnail()
 
-            let newsletterJid = '0@s.whatsapp.net'
-            if (global.rcanal && global.rcanal.includes('/channel/')) {
-                const code = global.rcanal.split('/channel/')[1]
-                newsletterJid = `${code}@newsletter`
-            }
+        const texto =
+            `👑 *ASCENSO DE RANGO* 👑\n\n` +
+            `🎖️ ${usuarioTag} *ha sido promovido a Administrador*\n` +
+            `en el reino de *${grupoNombre}*\n\n` +
+            `🤝 Promovido por: ${promotorTag}\n\n` +
+            `_¡Felicidades al nuevo Admin! Que sirvas bien al reino_ 🌸`
 
-            const params = {
-                text,
-                contextInfo: {
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid,
-                        serverMessageId: '',
-                        newsletterName: global.botName || 'Nino Nakano'
-                    },
-                    externalAdReply: {
-                        title: global.botName || 'Nino Nakano',
-                        body: 'Nino Nakano Group 💕',
-                        mediaType: 1,
-                        mediaUrl: global.rcanal || '',
-                        sourceUrl: global.rcanal || '',
-                        thumbnail,
-                        showAdAttribution: false,
-                        containsAutoReply: true,
-                        renderLargerThumbnail: true
-                    }
+        return conn.sendMessage(m.chat, {
+            text: texto,
+            mentions: [user, m.sender],
+            contextInfo: {
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    serverMessageId: '',
+                    newsletterName: global.newsletterName || 'Nino Nakano'
+                },
+                externalAdReply: {
+                    title: `👑 NUEVO ADMINISTRADOR`,
+                    body: `${global.botName || 'Nino Nakano'} — Sistema de Grupos`,
+                    mediaType: 1,
+                    mediaUrl: global.rcanal || '',
+                    sourceUrl: global.rcanal || '',
+                    thumbnail,
+                    showAdAttribution: false,
+                    containsAutoReply: true,
+                    renderLargerThumbnail: false
                 }
             }
-            return conn.sendMessage(m.chat, params, { quoted: m })
-        }
-
-        const mensaje = isOwner
-            ? `💖 *Promovido con éxito*\n\n👤 @${user.split('@')[0]}\n✨ Ahora es administrador del grupo\n\nMi rey siempre consigue lo que quiere\~ 🥰`
-            : `💕 *Usuario promovido*\n👤 @${user.split('@')[0]} ahora es administrador del grupo`
-
-        await sendAsChannel(mensaje, { mentions: [user] })
+        }, { quoted: m })
     }
 }
