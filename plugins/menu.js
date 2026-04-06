@@ -112,14 +112,14 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}tag*
 > *✧･ﾟ: ❏ ${prefix}promover / ${prefix}degradar*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 💰*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}daily / ${prefix}cofre*
 > *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work / ${prefix}chamba*
 > *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob / ${prefix}rob2*
 > *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
 > *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar / ${prefix}lvl*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG ⚔️*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG 𐦯*
 > *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
 > *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
 > *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
@@ -128,7 +128,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones / ${prefix}reclamar*
 > *✧･ﾟ: ❏ ${prefix}rpgtop*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 🔧*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 𐦯*
 > *✧･ﾟ: ❏ ${prefix}clima <ciudad>*
 > *✧･ﾟ: ❏ ${prefix}traducir <idioma> <texto>*
 > *✧･ﾟ: ❏ ${prefix}calc <operación>*
@@ -146,14 +146,14 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}pokedex <nombre>*
 > *✧･ﾟ: ❏ ${prefix}chiste / ${prefix}frase*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 🎵*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}play <canción>*
 > *✧･ﾟ: ❏ ${prefix}playvid <canción>*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🎨*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 𐦯*
 > *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 🤖*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
 > *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
