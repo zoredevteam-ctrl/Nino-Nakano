@@ -1,15 +1,8 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-const getThumbnailBuffer = async (url) => {
+const getThumbnail = async () => {
     try {
-        const res = await (await import('node-fetch')).default(url)
-        return await res.buffer()
-    } catch {
-        return null
-    }
+        const res = await fetch(global.banner || 'https://causas-files.vercel.app/fl/fu5r.jpg')
+        return Buffer.from(await res.arrayBuffer())
+    } catch { return null }
 }
 
 export default {
@@ -23,12 +16,10 @@ export default {
     async run(m, { conn, who, isOwner }) {
         let user = who || m.quoted?.sender || m.mentionedJid?.[0]
 
-        if (!user) {
-            return m.reply(isOwner 
-                ? `💕 Mi amor, dime a quién quieres degradar 🥺\nEjemplo: *#demote @usuario* o responde a su mensaje`
-                : `💕 ¿A quién quieres quitarle el admin? Menciona o responde.`
-            )
-        }
+        if (!user) return m.reply(isOwner
+            ? `💕 Mi amor, dime a quién quieres degradar 🥺\nEjemplo: *#demote @usuario* o responde a su mensaje`
+            : `💕 ¿A quién quieres quitarle el admin? Menciona o responde.`
+        )
 
         if (user.endsWith('@lid') && m.isGroup) {
             try {
@@ -41,51 +32,48 @@ export default {
         const meta = await conn.groupMetadata(m.chat)
         const participant = meta.participants.find(p => p.id === user || p.jid === user)
 
-        if (!participant) return m.reply(isOwner ? `💕 Mi cielo, esa persona no está en el grupo 🥺` : `💕 Esa persona no está en el grupo.`)
+        if (!participant) return m.reply(`💕 Esa persona no está en el grupo.`)
+        if (!participant.admin) return m.reply(`💕 Esa persona ni siquiera es admin.`)
 
-        if (!participant.admin) return m.reply(isOwner ? `💕 Mi amor, esa persona no es administrador 💕` : `💕 Esa persona ni siquiera es admin.`)
+        await conn.groupParticipantsUpdate(m.chat, [user], 'demote')
 
-        await conn.groupParticipantsUpdate(m.chat, [user], "demote")
+        // Nombre del que ejecutó el comando
+        const degradadorNombre = m.pushName || m.sender.split('@')[0]
+        const degradadorTag = `@${m.sender.split('@')[0]}`
+        const usuarioTag = `@${user.split('@')[0]}`
+        const grupoNombre = meta.subject || 'este reino'
 
-        const sendAsChannel = async (text) => {
-            const bannerUrl = global.banner || 'https://qu.ax/zRNgk.jpg'
-            const thumbnail = await getThumbnailBuffer(bannerUrl).catch(() => null)
+        const thumbnail = await getThumbnail()
 
-            let newsletterJid = '0@s.whatsapp.net'
-            if (global.rcanal && global.rcanal.includes('/channel/')) {
-                const code = global.rcanal.split('/channel/')[1]
-                newsletterJid = `${code}@newsletter`
-            }
+        const texto =
+            `🦋 *CAÍDA DE RANGO* 🦋\n\n` +
+            `🎀 ${usuarioTag} *ha sido bajado de rango*\n` +
+            `en el reino de *${grupoNombre}*\n\n` +
+            `🎀 Degradado por: ${degradadorTag}\n\n` +
+            `_El reino ha hablado. Ya no portarás la corona_ 🥀`
 
-            const params = {
-                text,
-                contextInfo: {
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid,
-                        serverMessageId: '',
-                        newsletterName: global.botName || 'Nino Nakano'
-                    },
-                    externalAdReply: {
-                        title: global.botName || 'Nino Nakano',
-                        body: 'Nino Nakano Group 💕',
-                        mediaType: 1,
-                        mediaUrl: global.rcanal || '',
-                        sourceUrl: global.rcanal || '',
-                        thumbnail,
-                        showAdAttribution: false,
-                        containsAutoReply: true,
-                        renderLargerThumbnail: true
-                    }
+        return conn.sendMessage(m.chat, {
+            text: texto,
+            mentions: [user, m.sender],
+            contextInfo: {
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    serverMessageId: '',
+                    newsletterName: global.newsletterName || 'Nino Nakano'
+                },
+                externalAdReply: {
+                    title: `⚔️ RANGO REMOVIDO`,
+                    body: `${global.botName || 'Nino Nakano'} — Sistema de Grupos`,
+                    mediaType: 1,
+                    mediaUrl: global.rcanal || '',
+                    sourceUrl: global.rcanal || '',
+                    thumbnail,
+                    showAdAttribution: false,
+                    containsAutoReply: true,
+                    renderLargerThumbnail: false
                 }
             }
-            return conn.sendMessage(m.chat, params, { quoted: m })
-        }
-
-        const mensaje = isOwner
-            ? `💔 *Degradado con éxito*\n\n👤 @${user.split('@')[0]}\n✨ Ya no es administrador\n\nSolo mi rey puede decidir quién manda aquí\~ 🥰`
-            : `💕 *Administrador degradado*\n👤 @${user.split('@')[0]} ya no es admin del grupo`
-
-        await sendAsChannel(mensaje, { mentions: [user] })
+        }, { quoted: m })
     }
 }
