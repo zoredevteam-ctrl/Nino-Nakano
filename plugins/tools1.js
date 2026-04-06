@@ -68,20 +68,36 @@ let handler = async (m, { conn, command, text, args }) => {
                 await m.react('❌')
                 return sendTool(conn, m, `🌤️ *CLIMA*\n\nUso: *#clima <ciudad>*\nEjemplo: *#clima Bogotá*`)
             }
-            const data = await apiGet(`${API}/search/weather?apikey=${APIKEY}&location=${encodeURIComponent(q)}`)
-            const w = data?.result || data?.data || data
-            if (!w || data?.error) {
+            // wttr.in - API gratuita con respuesta en JSON
+            const res = await fetch(`https://wttr.in/${encodeURIComponent(q)}?format=j1&lang=es`)
+            if (!res.ok) {
                 await m.react('❌')
                 return sendTool(conn, m, `❌ No encontré el clima de *${q}*\nVerifica el nombre de la ciudad.`)
             }
+            const data = await res.json()
+            const cc = data?.current_condition?.[0]
+            const area = data?.nearest_area?.[0]
+            if (!cc) {
+                await m.react('❌')
+                return sendTool(conn, m, `❌ No encontré datos del clima para *${q}*`)
+            }
+            const ciudad = area?.areaName?.[0]?.value || q
+            const pais = area?.country?.[0]?.value || ''
+            const temp = cc.temp_C + '°C'
+            const sensacion = cc.FeelsLikeC + '°C'
+            const humedad = cc.humidity + '%'
+            const viento = cc.windspeedKmph + ' km/h'
+            const desc = cc.lang_es?.[0]?.value || cc.weatherDesc?.[0]?.value || 'N/A'
+            const uv = cc.uvIndex || 'N/A'
             await m.react('✅')
             return sendTool(conn, m,
-                `🌤️ *CLIMA EN ${q.toUpperCase()}*\n\n` +
-                `🌡️ Temperatura: *${w.temperature || w.temp || 'N/A'}*\n` +
-                `💧 Humedad: *${w.humidity || 'N/A'}*\n` +
-                `🌬️ Viento: *${w.wind || w.windspeed || 'N/A'}*\n` +
-                `☁️ Condición: *${w.condition || w.description || w.weather || 'N/A'}*\n` +
-                `📍 Lugar: *${w.location || w.city || q}*`
+                `🌤️ *CLIMA EN ${ciudad.toUpperCase()}${pais ? ', ' + pais : ''}*\n\n` +
+                `🌡️ Temperatura: *${temp}*\n` +
+                `🤔 Sensación: *${sensacion}*\n` +
+                `💧 Humedad: *${humedad}*\n` +
+                `🌬️ Viento: *${viento}*\n` +
+                `☁️ Condición: *${desc}*\n` +
+                `☀️ Índice UV: *${uv}*`
             )
         }
 
