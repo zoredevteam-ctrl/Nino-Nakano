@@ -258,26 +258,55 @@ let handler = async (m, { conn, command, text, args }) => {
 
         // ==================== #chiste ====================
         if (cmd === 'chiste' || cmd === 'joke') {
-            const res = await fetch('https://official-joke-api.appspot.com/random_joke')
+            // API de chistes en español
+            const res = await fetch('https://v2.jokeapi.dev/joke/Any?lang=es&type=twopart&blacklistFlags=nsfw,racist,sexist')
             const data = await res.json()
+            let texto
+            if (data?.type === 'twopart' && data?.setup) {
+                texto = `😂 *CHISTE DEL DÍA*\n\n${data.setup}\n\n👉 ${data.delivery}`
+            } else if (data?.joke) {
+                texto = `😂 *CHISTE DEL DÍA*\n\n${data.joke}`
+            } else {
+                // Fallback con chistes propios en español
+                const chistes = [
+                    '¿Por qué el libro de matemáticas estaba triste?\nPorque tenía demasiados problemas 😂',
+                    '¿Qué le dice un jardinero a otro?\nHola compañero... digo, compañero 🌱',
+                    '¿Por qué los pájaros vuelan hacia el sur?\nPorque caminar es muy lejos 🐦',
+                    '¿Qué hace una abeja en el gimnasio?\n¡Zum-ba! 🐝',
+                    '¿Por qué el espantapájaros ganó un premio?\nPorque era sobresaliente en su campo 🌾'
+                ]
+                texto = `😂 *CHISTE DEL DÍA*\n\n${chistes[Math.floor(Math.random() * chistes.length)]}`
+            }
             await m.react('😂')
-            return sendTool(conn, m,
-                `😂 *CHISTE DEL DÍA*\n\n` +
-                `${data?.setup || 'No hay chiste disponible'}\n\n` +
-                `👉 ${data?.punchline || ''}`
-            )
+            return sendTool(conn, m, texto)
         }
 
         // ==================== #frase ====================
         if (cmd === 'frase' || cmd === 'quote') {
-            const res = await fetch('https://zenquotes.io/api/random')
-            const data = await res.json()
-            const frase = data?.[0]
+            // Frases inspiradoras en español
+            const frases = [
+                { q: 'El éxito no es la clave de la felicidad. La felicidad es la clave del éxito.', a: 'Albert Schweitzer' },
+                { q: 'No importa cuántas veces caes, sino cuántas veces te levantas.', a: 'Vince Lombardi' },
+                { q: 'El único modo de hacer un gran trabajo es amar lo que haces.', a: 'Steve Jobs' },
+                { q: 'La vida es lo que pasa mientras estás ocupado haciendo otros planes.', a: 'John Lennon' },
+                { q: 'En medio de las dificultades yace la oportunidad.', a: 'Albert Einstein' },
+                { q: 'El futuro pertenece a quienes creen en la belleza de sus sueños.', a: 'Eleanor Roosevelt' },
+                { q: 'No hay camino para la paz; la paz es el camino.', a: 'Mahatma Gandhi' },
+                { q: 'La imaginación es más importante que el conocimiento.', a: 'Albert Einstein' },
+                { q: 'Sé el cambio que quieres ver en el mundo.', a: 'Mahatma Gandhi' },
+                { q: 'El que tiene un porqué para vivir puede soportar casi cualquier cómo.', a: 'Friedrich Nietzsche' },
+                { q: 'La única manera de hacer algo bien es haciéndolo con amor.', a: 'Platón' },
+                { q: 'Caer está permitido. Levantarse es obligatorio.', a: 'Proverbio ruso' },
+                { q: 'No cuentes los días, haz que los días cuenten.', a: 'Muhammad Ali' },
+                { q: 'El talento gana partidos, pero el trabajo en equipo gana campeonatos.', a: 'Michael Jordan' },
+                { q: 'La perseverancia es la madre del éxito.', a: 'Charles Chaplin' }
+            ]
+            const frase = frases[Math.floor(Math.random() * frases.length)]
             await m.react('✨')
             return sendTool(conn, m,
                 `✨ *FRASE INSPIRADORA*\n\n` +
-                `_"${frase?.q || 'El éxito es la suma de pequeños esfuerzos repetidos día tras día.'}"_\n\n` +
-                `— *${frase?.a || 'Anónimo'}*`
+                `_"${frase.q}"_\n\n` +
+                `— *${frase.a}*`
             )
         }
 
