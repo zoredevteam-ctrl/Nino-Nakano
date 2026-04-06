@@ -102,25 +102,24 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SISTEMA 𐦯*
 > *✧･ﾟ: ❏ ${prefix}ping*
-> *✧･ﾟ: ❏ ${prefix}update*
+> *✧･ﾟ: ❏ ${prefix}update / ${prefix}restart*
+> *✧･ﾟ: ❏ ${prefix}checkplugins*
 > *✧･ﾟ: ❏ ${prefix}owner*
-> *✧･ﾟ: ❏ ${prefix}restart*
 > *✧･ﾟ: ❏ ${prefix}setprefix / ${prefix}delprefix*
 
 *꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 GRUPOS 𐦯*
-> *✧･ﾟ: ❏ ${prefix}kick*
-> *✧･ﾟ: ❏ ${prefix}ban*
+> *✧･ﾟ: ❏ ${prefix}kick / ${prefix}ban*
+> *✧･ﾟ: ❏ ${prefix}tag*
 > *✧･ﾟ: ❏ ${prefix}promover / ${prefix}degradar*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 💰*
 > *✧･ﾟ: ❏ ${prefix}daily / ${prefix}cofre*
 > *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work / ${prefix}chamba*
 > *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob / ${prefix}rob2*
 > *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
-> *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar*
-> *✧･ﾟ: ❏ ${prefix}lvl*
+> *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar / ${prefix}lvl*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG ⚔️*
 > *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
 > *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
 > *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
@@ -129,7 +128,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones / ${prefix}reclamar*
 > *✧･ﾟ: ❏ ${prefix}rpgtop*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 🔧*
 > *✧･ﾟ: ❏ ${prefix}clima <ciudad>*
 > *✧･ﾟ: ❏ ${prefix}traducir <idioma> <texto>*
 > *✧･ﾟ: ❏ ${prefix}calc <operación>*
@@ -141,24 +140,20 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}dado / ${prefix}cara*
 > *✧･ﾟ: ❏ ${prefix}wiki <tema>*
 > *✧･ﾟ: ❏ ${prefix}letra <canción>*
-> *✧･ﾟ: ❏ ${prefix}password <longitud>*
-> *✧･ﾟ: ❏ ${prefix}base64 encode/decode*
-> *✧･ﾟ: ❏ ${prefix}binario encode/decode*
-> *✧･ﾟ: ❏ ${prefix}hex encode/decode*
-> *✧･ﾟ: ❏ ${prefix}timestamp*
-> *✧･ﾟ: ❏ ${prefix}checkurl <url>*
-> *✧･ﾟ: ❏ ${prefix}ascii <texto>*
+> *✧･ﾟ: ❏ ${prefix}password / ${prefix}timestamp*
+> *✧･ﾟ: ❏ ${prefix}base64 / ${prefix}binario / ${prefix}hex*
+> *✧･ﾟ: ❏ ${prefix}checkurl / ${prefix}ascii*
 > *✧･ﾟ: ❏ ${prefix}pokedex <nombre>*
 > *✧･ﾟ: ❏ ${prefix}chiste / ${prefix}frase*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MÚSICA 🎵*
 > *✧･ﾟ: ❏ ${prefix}play <canción>*
 > *✧･ﾟ: ❏ ${prefix}playvid <canción>*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 🎨*
 > *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
 
-*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 🤖*
 > *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
