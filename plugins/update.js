@@ -1,66 +1,120 @@
 import { exec } from 'child_process'
 import chalk from 'chalk'
 
-/**
- * Sistema de Actualización Automática - Nino Bot
- * @param {import('../lib/simple').smsg} m 
- */
+const getThumbnail = async () => {
+    try {
+        const res = await fetch(global.banner || 'https://causas-files.vercel.app/fl/fu5r.jpg')
+        return Buffer.from(await res.arrayBuffer())
+    } catch { return null }
+}
+
+const sendUpdate = async (conn, m, text) => {
+    const thumbnail = await getThumbnail()
+    return conn.sendMessage(m.chat, {
+        text,
+        contextInfo: {
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                serverMessageId: '',
+                newsletterName: global.newsletterName || 'Nino Nakano'
+            },
+            externalAdReply: {
+                title: '🦋 NINO UPDATE SYSTEM',
+                body: 'Sistema de Actualización',
+                mediaType: 1,
+                mediaUrl: global.rcanal || '',
+                sourceUrl: global.rcanal || '',
+                thumbnail,
+                showAdAttribution: false,
+                containsAutoReply: true,
+                renderLargerThumbnail: false
+            }
+        }
+    }, { quoted: m })
+}
+
 let handler = async (m, { conn, isOwner }) => {
-    // 1. Doble seguridad de Owner
-    if (!isOwner) return m.reply('¡Lo siento mucho! 🥺 Pero mi creador Aarom me dijo que solo él puede usar esto. ¡No te enojes conmigo, por favor! 💕')
+    if (!isOwner) return m.reply('¡Lo siento mucho! 🥺 Solo Aarom puede usar esto. ¡No te enojes! 💕')
 
-    await m.reply('¡Claro que sí! 😼 Dame un segundito, voy a revisar con cuidado si hay alguna actualización nueva. 🦋✨')
+    await sendUpdate(conn, m, '🔍 Revisando actualizaciones... Dame un segundo 🦋')
 
-    // 2. Ejecutamos el comando Git
     exec('git pull', async (err, stdout, stderr) => {
         if (err) {
             console.error(chalk.red('[ERROR UPDATE]:'), err)
-            return m.reply(`❌ *¡AY NO! ALGO SALIÓ MAL...* 😭 \n\n_Perdóname, parece que hay un pequeño error. ¿Me ayudas a revisarlo, por favor?:_\n\`\`\`${err.message}\`\`\``)
+            return sendUpdate(conn, m,
+                `❌ *¡ERROR AL ACTUALIZAR!* 😭\n\n` +
+                `\`\`\`${err.message.slice(0, 300)}\`\`\``
+            )
         }
 
-        // 3. Caso: Ya está actualizado
+        // Ya está actualizado
         if (stdout.includes('Already up to date')) {
-            return m.reply('¡Ya estoy al día! 🌸 No hay archivos nuevos, sigo estando en mi mejor versión para ti. 🥰✨')
+            return sendUpdate(conn, m,
+                `✅ *¡Ya estoy al día!* 🌸\n\n` +
+                `No hay cambios nuevos, sigo siendo tu mejor versión 🥰\n\n` +
+                `_Si quieres reiniciar igual usa *#restart*_ 🦋`
+            )
         }
 
-        // 4. Caso: Hay cambios nuevos
-        if (stdout.includes('Updating') || stdout.includes('unpacking')) {
-            let updateMsg = `✅ *¡SISTEMA ACTUALIZADO CON ÉXITO!* 🦋
+        // Hay cambios nuevos — recargar plugins sin reiniciar
+        if (stdout.includes('Updating') || stdout.includes('Fast-forward') || stdout.includes('unpacking')) {
+            await sendUpdate(conn, m,
+                `✅ *¡ACTUALIZACIÓN EXITOSA!* 🦋\n\n` +
+                `📋 *Cambios aplicados:*\n\`\`\`${stdout.slice(0, 400)}\`\`\`\n\n` +
+                `🔄 Recargando plugins automáticamente...\n` +
+                `_No es necesario reiniciar_ 🌸`
+            )
 
-> ꒰⌢ ʚ˚₊‧ ✎ ꒱ *CAMBIOS:*
-\`\`\`${stdout}\`\`\`
+            // Recargar plugins dinámicamente sin reiniciar el proceso
+            try {
+                const { readdirSync } = await import('fs')
+                const { resolve, join } = await import('path')
+                const { pathToFileURL } = await import('url')
 
-Voy a reiniciarme rapidito para aplicar todas las cositas lindas que creó Aarom para mí... ¡No me tardo nada, espérame! 💕🌸`.trim()
+                const pluginsDir = resolve('./plugins')
+                const files = readdirSync(pluginsDir).filter(f => f.endsWith('.js'))
+                let recargados = 0
 
-            await conn.sendMessage(m.chat, { 
-                text: updateMsg,
-                contextInfo: {
-                    externalAdReply: {
-                        title: '🦋 NINO UPDATE SYSTEM 🦋',
-                        body: 'Sincronización de Archivos Exitosa',
-                        thumbnailUrl: global.banner,
-                        sourceUrl: global.rcanal,
-                        mediaType: 1,
-                        showAdAttribution: true,
-                        renderLargerThumbnail: true
+                for (const file of files) {
+                    try {
+                        const filePath = join(pluginsDir, file)
+                        const url = pathToFileURL(filePath).href + `?t=${Date.now()}`
+                        const mod = await import(url)
+                        if (mod.default) {
+                            global.plugins?.set(file, mod.default)
+                            recargados++
+                        }
+                    } catch (e) {
+                        console.error(chalk.red(`[UPDATE] Error recargando ${file}:`), e.message)
                     }
                 }
-            }, { quoted: m })
 
-            // 5. Reinicio Automático
-            console.log(chalk.magentaBright('\n[!] Reiniciando bot por actualización...\n'))
-            setTimeout(() => {
-                process.exit(0)
-            }, 2000)
+                console.log(chalk.magentaBright(`[UPDATE] ${recargados} plugins recargados`))
 
+                return sendUpdate(conn, m,
+                    `🎉 *¡Todo listo!*\n\n` +
+                    `✅ ${recargados} plugins recargados\n` +
+                    `_Los cambios ya están activos sin reiniciar_ 🦋`
+                )
+            } catch (e) {
+                console.error(chalk.red('[UPDATE] Error recargando plugins:'), e.message)
+                // Si falla la recarga, reiniciar como fallback
+                await sendUpdate(conn, m,
+                    `⚠️ No pude recargar los plugins automáticamente.\n` +
+                    `Reiniciando en 3 segundos... 🔄`
+                )
+                setTimeout(() => process.exit(0), 3000)
+            }
         } else {
-            // 6. Respuestas inesperadas
-            return m.reply(`⚠️ *Tengo una respuesta inesperada:* 🥺\n\n${stdout || stderr}`)
+            return sendUpdate(conn, m,
+                `⚠️ *Respuesta inesperada de git:*\n\n` +
+                `\`\`\`${(stdout || stderr || 'Sin respuesta').slice(0, 300)}\`\`\``
+            )
         }
     })
 }
 
-handler.command = ['update', 'actualizar', 'gitpull', 'fix']
-handler.owner = true 
-
+handler.command = ['update', 'actualizar', 'gitpull']
+handler.owner = true
 export default handler
