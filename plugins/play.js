@@ -5,7 +5,7 @@
  */
 
 const API = 'https://api.giftedtech.co.ke/api'
-const APIKEY = 'Fedex'
+const APIKEY = 'gifted'
 
 const sendNino = async (conn, m, text) => conn.sendMessage(m.chat, {
     text,
@@ -45,9 +45,10 @@ let handler = async (m, { conn, command, text }) => {
 
     try {
         // 1. Buscar en YouTube
-        const searchRes = await apiGet(`${API}/search/youtube?apikey=${APIKEY}&query=${encodeURIComponent(query)}`)
+        const searchRes = await apiGet(
+            `${API}/search/youtube?apikey=${APIKEY}&query=${encodeURIComponent(query)}`
+        )
 
-        // Manejar distintas estructuras de respuesta
         const results = searchRes?.result || searchRes?.results || searchRes?.data || []
         if (!results.length) {
             await m.react('❌')
@@ -55,14 +56,14 @@ let handler = async (m, { conn, command, text }) => {
         }
 
         const song = results[0]
-        const title    = song.title     || song.name        || 'Sin título'
-        const duration = song.duration  || song.length      || 'N/A'
-        const views    = song.views     || song.viewCount   || 'N/A'
-        const channel  = song.channel   || song.author      || song.uploader || 'N/A'
-        const thumb    = song.thumbnail || song.thumbnailUrl || song.image || ''
-        const videoUrl = song.url       || song.link        || song.videoUrl  || song.id
-            ? (song.url || song.link || song.videoUrl || `https://youtube.com/watch?v=${song.id}`)
-            : ''
+        const title    = song.title       || song.name        || 'Sin título'
+        const duration = song.duration    || song.length      || 'N/A'
+        const views    = song.views       || song.viewCount   || 'N/A'
+        const channel  = song.channel     || song.author      || song.uploader || 'N/A'
+        const thumb    = song.thumbnail   || song.thumbnailUrl || song.image   || ''
+        const videoId  = song.id          || ''
+        const videoUrl = song.url         || song.link        || song.videoUrl
+            || (videoId ? `https://youtube.com/watch?v=${videoId}` : '')
 
         if (!videoUrl) {
             await m.react('❌')
@@ -71,26 +72,28 @@ let handler = async (m, { conn, command, text }) => {
 
         await m.react('⬇️')
 
-        // 2. Descargar — probar varios servidores en orden
-        let finalUrl = null
+        // 2. Descargar usando los endpoints correctos de giftedtech
+        const dlEndpoint = isVideo ? 'ytmp4' : 'ytmp3'
+        const dlRes = await apiGet(
+            `${API}/download/${dlEndpoint}?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`
+        )
 
-        const servidores = isVideo
-            ? ['savetubemp4', 'ytmp4', 'ytvideo', 'ytv']
-            : ['savetubemp3', 'ytmp3', 'ytaudio', 'yta', 'dlmp3']
-
-        for (const srv of servidores) {
-            try {
-                const dlRes = await apiGet(`${API}/download/${srv}?apikey=${APIKEY}&url=${encodeURIComponent(videoUrl)}`)
-                const url = dlRes?.result?.downloadUrl || dlRes?.result?.url || dlRes?.result?.audio
-                    || dlRes?.result?.video || dlRes?.download_url || dlRes?.url || dlRes?.link
-                if (url) { finalUrl = url; break }
-            } catch { continue }
-        }
+        // Resolver URL de descarga según la estructura de respuesta
+        const finalUrl = dlRes?.result?.downloadUrl
+            || dlRes?.result?.url
+            || dlRes?.result?.audio
+            || dlRes?.result?.video
+            || dlRes?.download_url
+            || dlRes?.url
+            || dlRes?.link
+            || null
 
         if (!finalUrl) {
             await m.react('❌')
-            return sendNino(conn, m, `❌ No pude descargar *${title}*.\n\nIntenta de nuevo en unos segundos 🦋`)
-        }''
+            return sendNino(conn, m,
+                `❌ No pude descargar *${title}*.\n\nIntenta de nuevo en unos segundos 🦋`
+            )
+        }
 
         // 3. Descargar el buffer
         const mediaRes = await fetch(finalUrl)
@@ -105,7 +108,7 @@ let handler = async (m, { conn, command, text }) => {
             `👁️ *Vistas:* ${views}\n` +
             `🔗 *Link:* ${videoUrl}`
 
-        // 5. Enviar media con info del bot
+        // 5. Enviar media
         await m.react('📤')
 
         const contextInfo = {
@@ -135,7 +138,6 @@ let handler = async (m, { conn, command, text }) => {
                 contextInfo
             }, { quoted: m })
 
-            // Enviar info en mensaje aparte
             await conn.sendMessage(m.chat, {
                 text: infoTxt,
                 contextInfo
