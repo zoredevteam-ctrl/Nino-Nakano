@@ -17,7 +17,7 @@
     "axios": "^1.6.0",
     "cheerio": "^1.0.0-rc.12",
     "fluent-ffmpeg": "^2.1.2",
-    "jimp": "^0.22.10",
+    "jimp": "^1.6.0",
     "file-type": "^18.5.0"
   },
   "author": "Aarom - Z0RT SYSTEMS",
