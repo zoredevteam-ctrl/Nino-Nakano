@@ -28,11 +28,48 @@ global.prefix = '#'
 
 global.rcanal = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 
-// ✅ JID real del newsletter para que aparezca el botón de seguir
 global.newsletterJid = '120363408182996815@newsletter'
 global.newsletterName = '𓆩 ✧ 𝐍𝐢𝐧𝐨 ⌁ 𝑼𝒑𝒅𝒂𝒕𝒆𝒔 ✧ 𓆪'
 
+// Banner principal del bot owner
 global.banner = 'https://causas-files.vercel.app/fl/k7uk.jpg'
+
+// ————————————————————————————————————————————————————————————————————
+// BANNER CONTEXTUAL — Resuelve el banner correcto según contexto 🦋
+// Si hay un sub-bot activo con su propio banner, lo usa.
+// Si no, usa el banner principal del bot owner.
+// ————————————————————————————————————————————————————————————————————
+
+/**
+ * Retorna la URL del banner que corresponde al contexto actual.
+ * - Si se ejecuta dentro de un sub-bot con banner propio → banner del sub-bot
+ * - Si no → banner global del bot principal
+ * @param {object|null} db - La base de datos (opcional, para leer el banner del subbot)
+ * @returns {string} URL del banner activo
+ */
+global.getActiveBanner = (db = null) => {
+    const subbotId = global._currentSubbotId
+    if (subbotId && db?.subbots?.[subbotId]?.banner) {
+        return db.subbots[subbotId].banner
+    }
+    return global.banner
+}
+
+/**
+ * Descarga el banner activo y lo retorna como Buffer.
+ * Usa getActiveBanner internamente para resolver el correcto.
+ * @param {object|null} db - La base de datos (opcional)
+ * @returns {Buffer|null}
+ */
+global.getBannerThumb = async (db = null) => {
+    try {
+        const url = global.getActiveBanner(db)
+        const res = await fetch(url)
+        return Buffer.from(await res.arrayBuffer())
+    } catch {
+        return null
+    }
+}
 
 // ————————————————————————————————————————————————————————————————————
 // FUNCIÓN GLOBAL PARA NEWSLETTER CONTEXT 🦋
@@ -59,14 +96,6 @@ global.getNewsletterCtx = (thumbnail = null, title = null, body = null) => {
             renderLargerThumbnail: false
         }
     }
-}
-
-// Función helper para obtener thumbnail del banner
-global.getBannerThumb = async () => {
-    try {
-        const res = await fetch(global.banner)
-        return Buffer.from(await res.arrayBuffer())
-    } catch { return null }
 }
 
 // ————————————————————————————————————————————————————————————————————
