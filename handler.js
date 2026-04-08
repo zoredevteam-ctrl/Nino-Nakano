@@ -118,6 +118,21 @@ export const handler = async (m, conn, plugins) => {
 
         m = await smsg(conn, m);
 
+        // ══════════════════════════════════════════════════════════════════
+        // 🌸 BLOQUEO PRIMARY: si el grupo tiene primaryOnly activo y este
+        // conn es un sub-bot (tiene _subbotId), ignorar el mensaje.
+        // Los comandos #setprimary / #removeprimary siempre pasan.
+        // ══════════════════════════════════════════════════════════════════
+        if (m.isGroup && conn._subbotId) {
+            const groupData = database.data?.groups?.[m.chat]
+            if (groupData?.primaryOnly) {
+                const body = (m.body || '').trim().toLowerCase()
+                const isPrimaryCmd = body.startsWith('#setprimary') || body.startsWith('#removeprimary')
+                    || body.startsWith('.setprimary') || body.startsWith('.removeprimary')
+                if (!isPrimaryCmd) return
+            }
+        }
+
         if (m.isGroup) {
             const muted = database.data?.groups?.[m.chat]?.muted || [];
             if (muted.includes(m.sender)) {
