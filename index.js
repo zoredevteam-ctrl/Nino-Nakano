@@ -170,7 +170,7 @@ async function startBot() {
     }
   })
 
-  // Bienvenida / Despedida en grupos
+  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS ────────────────────────────────────────
   conn.ev.on('group-participants.update', async anu => {
     try {
       const metadata = await conn.groupMetadata(anu.id)
@@ -184,14 +184,26 @@ async function startBot() {
         }
 
         if (anu.action === 'add') {
-          const txt = `¡Oye, @${num.split('@')[0]}! No creas que me alegra que te hayas unido, pero intenta no ser una molestia en *${metadata.subject}*. Bienvenid@, supongo... 🦋🙄`
+          // 💖 Bienvenida cariñosa estilo Nino Nakano
+          const txt = [
+            `💐 ¡Bienvenid@ a *${metadata.subject}*, @${num.split('@')[0]}! 🎀`,
+            ``,
+            `Soy Nino... y aunque no suelo decir esto fácilmente...`,
+            `me alegra que estés aquí. 🌸`,
+            ``,
+            `Espero que te sientas cómodo/a, que respetes a todos`,
+            `y que disfrutes mucho tu tiempo con nosotros. 💕`,
+            ``,
+            `*¡Bienvenid@ de verdad!* 🦋✨`
+          ].join('\n')
+
           await conn.sendMessage(anu.id, {
             text: txt,
             contextInfo: {
               mentionedJid: [num],
               externalAdReply: {
-                title: 'NUEVO INTEGRANTE 🦋',
-                body: `Bienvenido a ${metadata.subject}`,
+                title: '🌸 ¡Nuevo integrante! 🌸',
+                body: `Bienvenido/a a ${metadata.subject}`,
                 thumbnailUrl: ppuser,
                 sourceUrl: global.rcanal || '',
                 mediaType: 1,
@@ -199,14 +211,22 @@ async function startBot() {
               }
             }
           })
+
         } else if (anu.action === 'remove') {
-          const txt = `@${num.split('@')[0]} se fue del grupo. Ugh, una molestia menos. ¡Ni regreses! 💅💢`
+          // 🍂 Despedida amable (sin ser tan cruel)
+          const txt = [
+            `🍂 @${num.split('@')[0]} ha salido de *${metadata.subject}*.`,
+            ``,
+            `Fue bonito tenerte aquí mientras duró... 🌙`,
+            `Cuídate mucho donde vayas. Quizás nos volvamos a ver. 💫`
+          ].join('\n')
+
           await conn.sendMessage(anu.id, {
             text: txt,
             contextInfo: {
               mentionedJid: [num],
               externalAdReply: {
-                title: 'USUARIO SALIENTE 🦋',
+                title: '🍂 Hasta pronto...',
                 body: `Se fue de ${metadata.subject}`,
                 thumbnailUrl: ppuser,
                 sourceUrl: global.rcanal || '',
