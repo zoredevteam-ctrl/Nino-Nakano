@@ -32,7 +32,7 @@ global.newsletterJid = '120363408182996815@newsletter'
 global.newsletterName = '𓆩 ✧ 𝐍𝐢𝐧𝐨 ⌁ 𝑼𝒑𝒅𝒂𝒕𝒆𝒔 ✧ 𓆪'
 
 // Banner principal del bot owner
-global.banner = 'https://causas-files.vercel.app/fl/k7uk.jp'
+global.banner = 'https://causas-files.vercel.app/fl/k7uk.jpg'
 
 // ————————————————————————————————————————————————————————————————————
 // BANNER CONTEXTUAL — Resuelve el banner correcto según contexto 🦋
