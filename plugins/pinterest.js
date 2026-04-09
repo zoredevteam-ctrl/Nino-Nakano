@@ -5,7 +5,7 @@
  */
 
 import axios from 'axios'
-import cheerio from 'cheerio'
+import * as cheerio from 'cheerio'
 
 // ─── DESCARGA DESDE URL ───────────────────────────────────────────────────────
 
@@ -160,7 +160,6 @@ let handler = async (m, { conn, text, args }) => {
         const top10 = urls.slice(0, 10)
         await m.react('⬇️')
 
-        // Enviar cada imagen individualmente
         for (let i = 0; i < top10.length; i++) {
             try {
                 await conn.sendMessage(m.chat, {
