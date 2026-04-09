@@ -34,9 +34,9 @@ let handler = async (m, { conn, usedPrefix }) => {
         const s = Math.floor(uptimeSeconds % 60)
         const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-        // Base de Datos segura para usuarios nuevos
+        // ✅ getUser crea el usuario si no existe, nunca undefined
+        const user = database.getUser(sender)
         const users = database.data?.users || {}
-        const user = users[sender] || {}
         const totalreg = Object.keys(users).length
 
         const userMoney = user.limit ?? 0
@@ -157,9 +157,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
-        // ✅ Leer el banner AQUÍ, justo antes de enviar
-        // En este punto global.banner ya fue seteado correctamente
-        // por el subbot-manager con el banner del sub-bot activo
+        // ✅ Leer el banner justo antes de enviar
         const bannerUrl = global.banner || ''
 
         await conn.sendMessage(m.chat, {
