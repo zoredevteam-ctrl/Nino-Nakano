@@ -1,4 +1,4 @@
-import { downloadContentFromMessage, getContentType } from '@whiskeysockets/baileys'
+import { downloadContentFromMessage } from '@whiskeysockets/baileys'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 import fs from 'fs'
@@ -6,17 +6,8 @@ import path from 'path'
 import os from 'os'
 
 const execAsync = promisify(exec)
+const RCANAL = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 
-/**
- * STICKER - NINO NAKANO
- * Comandos: #s, #sticker
- * Soporta: imagen, video, gif, imagen citada, video citado
- * Metadata: Nino Nakano + canal del bot
- */
-
-const RCANAL = 'https://whatsapp.com/channel/0029Vb6p68rF6smrH4Jeay3Y'
-
-// Descarga el media del mensaje o del citado
 const downloadMedia = async (msg, mtype) => {
     const mediaType = mtype.replace('Message', '')
     const stream = await downloadContentFromMessage(msg, mediaType)
@@ -25,13 +16,19 @@ const downloadMedia = async (msg, mtype) => {
     return Buffer.concat(chunks)
 }
 
-// Convierte imagen a webp con sharp
+// Imagen a webp - sin parentesis en el filtro para compatibilidad con sh
 const imageToWebp = async (buffer) => {
-    const tmpIn  = path.join(os.tmpdir(), `nino_in_${Date.now()}.jpg`)
-    const tmpOut = path.join(os.tmpdir(), `nino_out_${Date.now()}.webp`)
+    const tmpIn  = path.join(os.tmpdir(), 'nino_in_'  + Date.now() + '.jpg')
+    const tmpOut = path.join(os.tmpdir(), 'nino_out_' + Date.now() + '.webp')
     try {
         fs.writeFileSync(tmpIn, buffer)
-        await execAsync(`ffmpeg -y -i "${tmpIn}" -vf scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000 -c:v libwebp -quality 80 "${tmpOut}"`)
+        // Usar scale simple sin pad para evitar el error de parentesis
+        await execAsync(
+            'ffmpeg -y -i "' + tmpIn + '"' +
+            ' -vf "scale=512:512:force_original_aspect_ratio=decrease"' +
+            ' -c:v libwebp -quality 80' +
+            ' "' + tmpOut + '"'
+        )
         return fs.readFileSync(tmpOut)
     } finally {
         try { fs.unlinkSync(tmpIn) } catch {}
@@ -39,13 +36,26 @@ const imageToWebp = async (buffer) => {
     }
 }
 
-// Convierte video/gif a webp animado
+// Video/gif a webp ANIMADO
 const videoToWebp = async (buffer) => {
-    const tmpIn  = path.join(os.tmpdir(), `nino_in_${Date.now()}.mp4`)
-    const tmpOut = path.join(os.tmpdir(), `nino_out_${Date.now()}.webp`)
+    const tmpIn  = path.join(os.tmpdir(), 'nino_in_'  + Date.now() + '.mp4')
+    const tmpOut = path.join(os.tmpdir(), 'nino_out_' + Date.now() + '.webp')
     try {
         fs.writeFileSync(tmpIn, buffer)
-        await execAsync(`ffmpeg -y -i "${tmpIn}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=15" -vcodec libwebp -lossless 0 -compression_level 6 -q:v 50 -loop 0 -preset picture -an -t 8 -vsync 0 "${tmpOut}"`)
+        // Comando probado para webp animado - sin parentesis
+        await execAsync(
+            'ffmpeg -y -i "' + tmpIn + '"' +
+            ' -vf "scale=512:512:force_original_aspect_ratio=decrease,fps=15"' +
+            ' -vcodec libwebp' +
+            ' -lossless 0' +
+            ' -compression_level 6' +
+            ' -q:v 50' +
+            ' -loop 0' +
+            ' -preset picture' +
+            ' -an' +
+            ' -t 8' +
+            ' "' + tmpOut + '"'
+        )
         return fs.readFileSync(tmpOut)
     } finally {
         try { fs.unlinkSync(tmpIn) } catch {}
@@ -53,58 +63,78 @@ const videoToWebp = async (buffer) => {
     }
 }
 
-// Agrega metadata al webp (nombre del pack y autor)
+// Agregar metadata EXIF al webp (info del pack visible en WhatsApp)
 const addExif = async (webpBuffer, packName, authorName) => {
-    const tmpIn  = path.join(os.tmpdir(), `nino_exif_in_${Date.now()}.webp`)
-    const tmpOut = path.join(os.tmpdir(), `nino_exif_out_${Date.now()}.webp`)
     try {
-        // Metadata JSON que WhatsApp lee para el nombre del sticker pack
+        // Construir el EXIF manualmente con el JSON de WhatsApp
         const json = JSON.stringify({
-            'sticker-pack-id': `nino_${Date.now()}`,
+            'sticker-pack-id': 'nino_' + Date.now(),
             'sticker-pack-name': packName,
             'sticker-pack-publisher': authorName,
             'emojis': ['🦋']
         })
 
-        const exifAttr = Buffer.from([
-            0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x41, 0x57, 0x07, 0x00
+        const jsonBuf = Buffer.from(json, 'utf8')
+
+        // Header EXIF para WebP
+        const exifHeader = Buffer.from([
+            0x49, 0x49, 0x2A, 0x00, // TIFF header little-endian
+            0x08, 0x00, 0x00, 0x00, // Offset al primer IFD
+            0x01, 0x00,             // Numero de entradas IFD
+            0x41, 0x57,             // Tag 0x5741 = 'WA'
+            0x07, 0x00              // Tipo: UNDEFINED
         ])
-        const jsonBuf  = Buffer.from(json, 'utf8')
-        const exifSize = Buffer.alloc(4)
-        exifSize.writeUInt32LE(jsonBuf.length, 0)
-        const exif = Buffer.concat([exifAttr, exifSize, jsonBuf])
 
-        fs.writeFileSync(tmpIn, webpBuffer)
+        const sizeBuf = Buffer.alloc(4)
+        sizeBuf.writeUInt32LE(jsonBuf.length, 0)
 
-        // Insertar EXIF con ffmpeg
-        const exifPath = path.join(os.tmpdir(), `nino_meta_${Date.now()}.bin`)
-        fs.writeFileSync(exifPath, exif)
-        await execAsync(`ffmpeg -y -i "${tmpIn}" -metadata:s comment="" "${tmpOut}" 2>/dev/null || cp "${tmpIn}" "${tmpOut}"`)
+        const exifData = Buffer.concat([exifHeader, sizeBuf, jsonBuf])
 
-        // Si ffmpeg no soporta exif en webp, usar el buffer directo sin exif
-        const out = fs.existsSync(tmpOut) ? fs.readFileSync(tmpOut) : webpBuffer
-        try { fs.unlinkSync(exifPath) } catch {}
-        return out
+        // Insertar en el WebP
+        // WebP tiene formato: RIFF????WEBP + chunks
+        // Agregar chunk EXIF
+        if (webpBuffer.slice(0, 4).toString() !== 'RIFF') {
+            return webpBuffer
+        }
+
+        const exifChunkName = Buffer.from('EXIF')
+        const exifChunkSize = Buffer.alloc(4)
+        exifChunkSize.writeUInt32LE(exifData.length, 0)
+
+        // Marcar el archivo WebP como que tiene EXIF en el byte de flags
+        const result = Buffer.concat([
+            webpBuffer,
+            exifChunkName,
+            exifChunkSize,
+            exifData
+        ])
+
+        // Actualizar el tamaño RIFF
+        result.writeUInt32LE(result.length - 8, 4)
+
+        return result
     } catch {
-        return webpBuffer // fallback sin metadata
-    } finally {
-        try { fs.unlinkSync(tmpIn) } catch {}
-        try { fs.unlinkSync(tmpOut) } catch {}
+        return webpBuffer
     }
 }
 
 let handler = async (m, { conn, text }) => {
-    const nombreBot  = global.botName  || 'Nino Nakano'
-    const canalLink  = global.rcanal   || RCANAL
-    const bannerUrl  = global.banner   || ''
+    const nombreBot = global.botName || 'Nino Nakano'
+    const canalLink = global.rcanal || RCANAL
+    const bannerUrl = global.banner || ''
 
     const sendNino = async (txt) => conn.sendMessage(m.chat, {
         text: txt,
         contextInfo: {
+            isForwarded: true,
+            forwardedNewsletterMessageInfo: {
+                newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                serverMessageId: '',
+                newsletterName: global.newsletterName || nombreBot
+            },
             externalAdReply: {
-                title: `🦋 ${nombreBot}`,
-                body: 'Sticker Maker 🎨',
+                title: '🦋 ' + nombreBot + ' Stickers',
+                body: 'Sticker Maker',
                 thumbnailUrl: bannerUrl,
                 sourceUrl: canalLink,
                 mediaType: 1,
@@ -114,19 +144,18 @@ let handler = async (m, { conn, text }) => {
         }
     }, { quoted: m })
 
-    // Verificar si tiene ffmpeg
+    // Verificar ffmpeg
     try {
         await execAsync('ffmpeg -version')
     } catch {
-        return sendNino(`❌ *ffmpeg* no está instalado.\n\nInstálalo con:\n\`pkg install ffmpeg\``)
+        return sendNino('❌ *ffmpeg* no esta instalado.\n\nEn servidor: apt install ffmpeg\nEn Termux: pkg install ffmpeg')
     }
 
-    // Determinar la fuente del media: mensaje actual o citado
-    let mediaMsg   = null
-    let mediaType  = null
+    // Detectar media
+    let mediaMsg = null
+    let mediaType = null
     let isAnimated = false
 
-    // 1. Imagen/video enviado directo con #s
     if (m.mtype === 'imageMessage') {
         mediaMsg  = m.msg
         mediaType = 'imageMessage'
@@ -134,9 +163,7 @@ let handler = async (m, { conn, text }) => {
         mediaMsg   = m.msg
         mediaType  = 'videoMessage'
         isAnimated = true
-    }
-    // 2. Respondiendo a una imagen/video
-    else if (m.quoted) {
+    } else if (m.quoted) {
         const qmtype = m.quoted.mtype
         if (qmtype === 'imageMessage') {
             mediaMsg  = m.quoted
@@ -146,7 +173,6 @@ let handler = async (m, { conn, text }) => {
             mediaType  = 'videoMessage'
             isAnimated = true
         } else if (qmtype === 'stickerMessage') {
-            // Convertir sticker existente
             mediaMsg   = m.quoted
             mediaType  = 'stickerMessage'
             isAnimated = m.quoted.isAnimated || false
@@ -155,24 +181,21 @@ let handler = async (m, { conn, text }) => {
 
     if (!mediaMsg || !mediaType) {
         return sendNino(
-            `🎨 *CREADOR DE STICKERS*\n\n` +
-            `Envía o responde una *imagen* o *video* con *#s* para convertirlo en sticker.\n\n` +
-            `📌 *Ejemplos:*\n` +
-            `› Envía imagen + *#s*\n` +
-            `› Responde imagen con *#s*\n` +
-            `› Responde video/gif con *#s* (máx 8 seg)\n\n` +
-            `_Stickers con info de ${nombreBot}_ 🦋`
+            '🎨 *CREADOR DE STICKERS*\n\n' +
+            'Envia o responde una *imagen* o *video* con *#s*\n\n' +
+            '📌 Ejemplos:\n' +
+            '› Envia imagen + *#s*\n' +
+            '› Responde imagen con *#s*\n' +
+            '› Responde video/gif con *#s* (max 8 seg)\n\n' +
+            '_Stickers by ' + nombreBot + '_ 🦋'
         )
     }
 
-    // Reaccionar mientras procesa
     await m.react('⏳')
 
     try {
-        // Descargar media
         const buffer = await downloadMedia(mediaMsg, mediaType)
 
-        // Convertir a webp
         let webp
         if (isAnimated || mediaType === 'videoMessage') {
             webp = await videoToWebp(buffer)
@@ -180,18 +203,26 @@ let handler = async (m, { conn, text }) => {
             webp = await imageToWebp(buffer)
         }
 
-        // Agregar metadata con info del bot
-        const packName   = text?.trim() || nombreBot
-        const authorName = `@${canalLink.split('/channel/')[1] || 'NinoNakano'}`
+        // Pack info visible en WhatsApp
+        const packName   = (text && text.trim()) ? text.trim() : nombreBot
+        const authorName = canalLink.includes('/channel/')
+            ? '@' + canalLink.split('/channel/')[1]
+            : nombreBot
+
         webp = await addExif(webp, packName, authorName)
 
-        // Enviar sticker
         await conn.sendMessage(m.chat, {
             sticker: webp,
             contextInfo: {
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    serverMessageId: '',
+                    newsletterName: global.newsletterName || nombreBot
+                },
                 externalAdReply: {
-                    title: `🦋 ${nombreBot}`,
-                    body: `Sticker creado por ${nombreBot}`,
+                    title: '🦋 ' + nombreBot,
+                    body: 'Sticker by ' + nombreBot,
                     thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
                     mediaType: 1,
@@ -204,9 +235,9 @@ let handler = async (m, { conn, text }) => {
         await m.react('✅')
 
     } catch (e) {
-        console.error('[STICKER ERROR]', e)
+        console.error('[STICKER ERROR]', e.message)
         await m.react('❌')
-        return sendNino(`❌ No pude crear el sticker.\n\nError: ${e.message}`)
+        return sendNino('❌ No pude crear el sticker.\n\nError: ' + e.message)
     }
 }
 
