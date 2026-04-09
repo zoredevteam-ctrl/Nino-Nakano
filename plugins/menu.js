@@ -1,5 +1,20 @@
 import { database } from '../lib/database.js'
 
+// ✅ Convierte banner (URL o base64) a Buffer para thumbnail
+const getBannerBuffer = async (bannerSrc) => {
+    if (!bannerSrc) return null
+    try {
+        if (bannerSrc.startsWith('data:image')) {
+            const base64Data = bannerSrc.split(',')[1]
+            return Buffer.from(base64Data, 'base64')
+        }
+        const res = await fetch(bannerSrc)
+        return Buffer.from(await res.arrayBuffer())
+    } catch {
+        return null
+    }
+}
+
 let handler = async (m, { conn, usedPrefix }) => {
     try {
         const sender = m.sender
@@ -34,7 +49,7 @@ let handler = async (m, { conn, usedPrefix }) => {
         const s = Math.floor(uptimeSeconds % 60)
         const uptime = `${d}d ${h}h ${min}m ${s}s`
 
-        // ✅ getUser crea el usuario si no existe, nunca undefined
+        // ✅ getUser crea el usuario si no existe
         const user = database.getUser(sender)
         const users = database.data?.users || {}
         const totalreg = Object.keys(users).length
@@ -157,8 +172,9 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
-        // ✅ Leer el banner justo antes de enviar
-        const bannerUrl = global.banner || ''
+        // ✅ Leer banner justo antes de enviar y convertir a Buffer
+        const bannerSrc = global.banner || ''
+        const thumbnail = await getBannerBuffer(bannerSrc)
 
         await conn.sendMessage(m.chat, {
             text: txt,
@@ -172,7 +188,8 @@ _Aquí tienes todo lo que puedo hacer por ti:_
                 externalAdReply: {
                     title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
                     body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de Aarom',
-                    thumbnailUrl: bannerUrl,
+                    // ✅ thumbnail como Buffer, funciona tanto con URL como con base64
+                    thumbnail,
                     sourceUrl: canalLink,
                     mediaType: 1,
                     showAdAttribution: true,
