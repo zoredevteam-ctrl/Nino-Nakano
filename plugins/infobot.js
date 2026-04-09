@@ -40,14 +40,14 @@ let handler = async (m, { conn }) => {
         const nodeVer  = process.version
 
         // ── Plataforma legible ────────────────────────────────────────────────
-        const plataformas = { linux: '🐧 Linux', win32: '🪟 Windows', darwin: '🍎 macOS', android: '🤖 Android' }
+        const plataformas = { linux: '🐧 Linux', win32: '🪟 Windows', darwin: '🍎 macOS', android: '👑 Android' }
         const plataforma  = plataformas[platform] || platform
 
         // ── Tipo de bot ───────────────────────────────────────────────────────
         const tipoBot = esSubbot ? '🤖 Sub-Bot' : '💎 Bot Principal'
 
         const txt =
-`*╭╼𝅄꒰ 🤖 ꒱ 𐔌 INFO DEL BOT 𐦯*
+`*╭╼𝅄꒰ 🌟 ꒱ 𐔌 INFO DEL BOT 𐦯*
 *|✎ Nombre:* ${nombreBot}
 *|✎ Versión:* v${version}
 *|✎ Tipo:* ${tipoBot}
@@ -56,7 +56,7 @@ let handler = async (m, { conn }) => {
 *|✎ Canal:* ${canalLink}
 *╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🦋◌⃘⃪۪𐇽֟፝۫۬🦋◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
 
-*╭╼𝅄꒰ ⚙️ ꒱ 𐔌 SISTEMA 𐦯*
+*╭╼𝅄꒰ 🎀 ꒱ 𐔌 SISTEMA 𐦯*
 *|✎ Plataforma:* ${plataforma}
 *|✎ Arquitectura:* ${arch}
 *|✎ Node.js:* ${nodeVer}
@@ -83,7 +83,7 @@ let handler = async (m, { conn }) => {
                     newsletterName: global.newsletterName || nombreBot
                 },
                 externalAdReply: {
-                    title: `🤖 ${nombreBot.toUpperCase()} v${version}`,
+                    title: `🎀 ${nombreBot.toUpperCase()} v${version}`,
                     body: `${tipoBot} — ${plataforma}`,
                     thumbnailUrl: bannerUrl,
                     sourceUrl: canalLink,
