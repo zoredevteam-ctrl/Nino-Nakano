@@ -5,8 +5,6 @@
  * APIs: GiftedTech (Fedex) -> AlyaBot -> Causas
  */
 
-import yts from 'yt-search'
-
 const GIFTED_API = 'https://api.giftedtech.co.ke/api'
 const GIFTED_KEY = 'Fedex'
 const ALYA_KEY   = 'Duarte-zz12'
@@ -184,25 +182,35 @@ let handler = async (m, { conn, command, text }) => {
     await m.react('🔍')
 
     try {
-        // 1. Buscar con yt-search
-        const search = await yts(query)
-        const song   = search?.videos?.[0] || search?.all?.[0]
+        // 1. Buscar via GiftedTech YouTube Search
+        let title = query, duration = 'N/A', views = 'N/A', channel = 'N/A'
+        let thumb = global.banner || '', videoUrl = ''
 
-        if (!song) {
-            await m.react('❌')
-            return sendPlay(conn, m, '❌ No encontre resultados para *' + query + '*\n\nIntenta con otro nombre')
+        try {
+            const searchRes = await apiGet(GIFTED_API + '/search/youtube?apikey=' + GIFTED_KEY + '&query=' + encodeURIComponent(query))
+            const results = searchRes?.result || searchRes?.results || searchRes?.data || []
+            const song = results[0]
+            if (song) {
+                title    = song.title || query
+                duration = song.duration || song.length || 'N/A'
+                views    = formatViews(song.views || song.viewCount || 0)
+                channel  = song.channel || song.author || song.uploader || 'N/A'
+                thumb    = song.thumbnail || song.image || global.banner || ''
+                videoUrl = song.url || song.link || (song.id ? 'https://youtube.com/watch?v=' + song.id : '')
+            }
+        } catch (e) {
+            console.log('[PLAY] Busqueda fallida: ' + e.message)
         }
 
-        const title    = song.title || 'Sin titulo'
-        const duration = song.timestamp || song.duration || 'N/A'
-        const views    = formatViews(song.views ?? song.viewCount ?? 0)
-        const channel  = (typeof song.author === 'object' ? song.author?.name : song.author) || 'N/A'
-        const thumb    = song.thumbnail || song.image || global.banner || ''
-        const videoUrl = song.url || ''
-
+        // Si la busqueda fallo, intentar con el query como URL directa
         if (!videoUrl) {
-            await m.react('❌')
-            return sendPlay(conn, m, '❌ No pude obtener el link del video.')
+            if (query.includes('youtube.com') || query.includes('youtu.be')) {
+                videoUrl = query
+                title = query
+            } else {
+                await m.react('❌')
+                return sendPlay(conn, m, '❌ No encontre resultados para *' + query + '*\n\nIntenta con otro nombre')
+            }
         }
 
         await m.react('⬇️')
