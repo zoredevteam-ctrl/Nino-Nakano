@@ -7,7 +7,6 @@ let handler = async (m, { conn, usedPrefix }) => {
         const username = m.pushName || 'Tesoro'
         const nombreBot = global.botName || 'Nino Nakano'
         const canalLink = global.rcanal || ''
-        const bannerUrl = global.banner || ''
 
         // Saludo según hora
         const hora = new Date().getHours()
@@ -157,6 +156,11 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}code <número>*
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
+
+        // ✅ Leer el banner AQUÍ, justo antes de enviar
+        // En este punto global.banner ya fue seteado correctamente
+        // por el subbot-manager con el banner del sub-bot activo
+        const bannerUrl = global.banner || ''
 
         await conn.sendMessage(m.chat, {
             text: txt,
