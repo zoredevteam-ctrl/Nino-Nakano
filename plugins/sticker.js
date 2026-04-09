@@ -123,26 +123,33 @@ let handler = async (m, { conn, text }) => {
     const canalLink = global.rcanal || RCANAL
     const bannerUrl = global.banner || ''
 
-    const sendNino = async (txt) => conn.sendMessage(m.chat, {
-        text: txt,
-        contextInfo: {
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
-                serverMessageId: '',
-                newsletterName: global.newsletterName || nombreBot
-            },
-            externalAdReply: {
-                title: '🦋 ' + nombreBot + ' Stickers',
-                body: 'Sticker Maker',
-                thumbnailUrl: bannerUrl,
-                sourceUrl: canalLink,
-                mediaType: 1,
-                renderLargerThumbnail: false,
-                showAdAttribution: false
+    const sendNino = async (txt) => {
+        let thumbBuf = null
+        try {
+            const r = await fetch(bannerUrl || 'https://causas-files.vercel.app/fl/cyns.png')
+            thumbBuf = Buffer.from(await r.arrayBuffer())
+        } catch {}
+        return conn.sendMessage(m.chat, {
+            text: txt,
+            contextInfo: {
+                isForwarded: true,
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    serverMessageId: '',
+                    newsletterName: global.newsletterName || nombreBot
+                },
+                externalAdReply: {
+                    title: '🦋 ' + nombreBot + ' Stickers',
+                    body: 'Sticker Maker',
+                    thumbnail: thumbBuf,
+                    sourceUrl: canalLink,
+                    mediaType: 1,
+                    renderLargerThumbnail: false,
+                    showAdAttribution: false
+                }
             }
-        }
-    }, { quoted: m })
+        }, { quoted: m })
+    }
 
     // Verificar ffmpeg
     try {
@@ -211,8 +218,19 @@ let handler = async (m, { conn, text }) => {
 
         webp = await addExif(webp, packName, authorName)
 
+        // Enviar sticker (sin contextInfo, Baileys no lo soporta en stickers)
         await conn.sendMessage(m.chat, {
-            sticker: webp,
+            sticker: webp
+        }, { quoted: m })
+
+        // Mensaje de confirmacion con newsletter
+        const thumbBuf = await fetch(bannerUrl || 'https://causas-files.vercel.app/fl/cyns.png')
+            .then(r => r.arrayBuffer())
+            .then(b => Buffer.from(b))
+            .catch(() => null)
+
+        await conn.sendMessage(m.chat, {
+            text: '✅ *Sticker creado por ' + nombreBot + '* 🦋',
             contextInfo: {
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
@@ -221,9 +239,9 @@ let handler = async (m, { conn, text }) => {
                     newsletterName: global.newsletterName || nombreBot
                 },
                 externalAdReply: {
-                    title: '🦋 ' + nombreBot,
-                    body: 'Sticker by ' + nombreBot,
-                    thumbnailUrl: bannerUrl,
+                    title: '🦋 ' + nombreBot + ' Stickers',
+                    body: 'Sticker creado exitosamente',
+                    thumbnail: thumbBuf,
                     sourceUrl: canalLink,
                     mediaType: 1,
                     renderLargerThumbnail: false,
