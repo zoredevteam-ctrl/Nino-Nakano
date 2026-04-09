@@ -10,14 +10,46 @@ import { startSubBot, stopSubBot, getSubBots } from '../lib/subbot-manager.js'
 const RCANAL = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 const MAX_SUBBOTS = 30
 
-const sendNino = async (conn, m, text) => {
-    const canalLink = global.rcanal || RCANAL
-    let thumbnail = null
+// ✅ Cache de buffers de banners en memoria (evita re-descargar cada vez)
+// key: subbotId o 'main', value: Buffer
+const bannerCache = new Map()
+
+/**
+ * Obtiene el thumbnail como Buffer para usar en externalAdReply.
+ * - Si el banner es base64 → lo convierte a Buffer directamente
+ * - Si es URL https:// → lo descarga y cachea
+ * - Si falla → retorna null
+ */
+const getBannerBuffer = async (bannerUrlOrBase64, cacheKey = 'main') => {
+    if (!bannerUrlOrBase64) return null
+
+    // Si ya está en cache, usar ese
+    if (bannerCache.has(cacheKey)) return bannerCache.get(cacheKey)
+
     try {
-        const res = await fetch(global.banner || '')
-        const buf = await res.arrayBuffer()
-        thumbnail = Buffer.from(buf)
-    } catch {}
+        let buffer
+        if (bannerUrlOrBase64.startsWith('data:image')) {
+            // Base64 → Buffer directo
+            const base64Data = bannerUrlOrBase64.split(',')[1]
+            buffer = Buffer.from(base64Data, 'base64')
+        } else {
+            // URL → descargar
+            const res = await fetch(bannerUrlOrBase64)
+            buffer = Buffer.from(await res.arrayBuffer())
+        }
+        bannerCache.set(cacheKey, buffer)
+        return buffer
+    } catch {
+        return null
+    }
+}
+
+const sendNino = async (conn, m, text, subbotKey = null) => {
+    const canalLink = global.rcanal || RCANAL
+    const bannerSrc = subbotKey
+        ? (database.data?.subbots?.[subbotKey]?.banner || global.banner || '')
+        : (global.banner || '')
+    const thumbnail = await getBannerBuffer(bannerSrc, subbotKey || 'main')
 
     return conn.sendMessage(m.chat, {
         text,
@@ -31,7 +63,8 @@ const sendNino = async (conn, m, text) => {
             externalAdReply: {
                 title: global.botName || 'Nino Nakano',
                 body: 'Sistema de Sub-Bots 🎀',
-                thumbnailUrl: global.banner || '',
+                // ✅ Usar thumbnail como Buffer, no como URL base64
+                thumbnail,
                 sourceUrl: canalLink,
                 mediaType: 1,
                 renderLargerThumbnail: true,
@@ -75,7 +108,6 @@ export default {
                 return sendNino(conn, m, `❌ Se alcanzó el límite máximo de *${MAX_SUBBOTS} sub-bots*. Elimina uno antes de agregar otro.\n\nUsa *#subbots* para ver la lista.`)
             }
 
-            // Pedir número
             const numArg = (text || '').replace(/\D/g, '')
             if (!numArg || numArg.length < 8) {
                 return sendNino(conn, m,
@@ -87,16 +119,13 @@ export default {
                 )
             }
 
-            // Verificar si ya tiene un subbot ese número
             const yaExiste = Object.values(subbots).find(s => s.phone === numArg)
             if (yaExiste) {
                 return sendNino(conn, m, `🦋 El número *+${numArg}* ya tiene un sub-bot registrado.\n\nUsa *#delsubbot ${numArg}* para eliminarlo primero.`)
             }
 
-            // Generar ID para el subbot
             const subbotId = `subbot_${Date.now()}`
 
-            // Informar que se está procesando
             await sendNino(conn, m,
                 `👑 *VINCULANDO SUB-BOT...*\n\n` +
                 `📱 Número: *+${numArg}*\n` +
@@ -105,25 +134,22 @@ export default {
             )
 
             try {
-                // Iniciar sesión del subbot y obtener código
                 const result = await startSubBot(subbotId, numArg, conn, db)
 
                 if (!result.success) {
                     return sendNino(conn, m, `❌ Error al generar el código: ${result.error}`)
                 }
 
-                // Guardar en db
                 subbots[subbotId] = {
                     id: subbotId,
                     phone: numArg,
                     owner: sender,
                     name: `SubBot ${Object.keys(subbots).length + 1}`,
-                    banner: global.banner || '',
+                    banner: '',
                     connected: false,
                     createdAt: Date.now()
                 }
 
-                // Mensaje con instrucciones
                 await conn.sendMessage(m.chat, {
                     text:
                         `👑 *VINCULAR SUB-BOT*\n\n` +
@@ -136,10 +162,7 @@ export default {
                         `⏱️ _El código expira en 60 segundos_`
                 }, { quoted: m })
 
-                // Mensaje solo con el código para copiar y pegar fácil
-                await conn.sendMessage(m.chat, {
-                    text: result.code
-                })
+                await conn.sendMessage(m.chat, { text: result.code })
 
             } catch (e) {
                 console.error('[SUBBOT CODE ERROR]', e)
@@ -173,13 +196,12 @@ export default {
             return sendNino(conn, m, txt)
         }
 
-        // ==================== #setnombre (cambiar nombre del sub-bot) ====================
+        // ==================== #setnombre ====================
         if (cmd === 'setnombre') {
             if (!text || !text.trim()) {
                 return sendNino(conn, m, `💕 Usa: *#setnombre <nombre>*\nEjemplo: *#setnombre Mi Bot Bonito*`)
             }
 
-            // Buscar el subbot del sender
             const miSubbot = Object.entries(subbots).find(([, s]) => s.owner === sender)
 
             if (!miSubbot && !isOwner) {
@@ -189,26 +211,16 @@ export default {
             const nuevoNombre = text.trim().slice(0, 50)
 
             if (isOwner && !miSubbot) {
-                // Owner puede cambiar el nombre del bot principal
                 global.botName = nuevoNombre
                 return sendNino(conn, m, `✅ Nombre del bot principal cambiado a: *${nuevoNombre}*`)
             }
 
-            const [subbotKey, subbotData] = miSubbot
+            const [subbotKey] = miSubbot
             subbots[subbotKey].name = nuevoNombre
-
-            // Aplicar en la sesión activa si está conectada
-            try {
-                const sbConn = getSubBots().get(subbotKey)
-                if (sbConn?.user) {
-                    // El nombre se aplica visualmente en el menú, no hay API para cambiar nombre de WhatsApp
-                }
-            } catch {}
-
-            return sendNino(conn, m, `✅ Nombre del sub-bot cambiado a: *${nuevoNombre}*\n\nSe mostrará así en el menú del sub-bot 🌸`)
+            return sendNino(conn, m, `✅ Nombre del sub-bot cambiado a: *${nuevoNombre}*\n\nSe mostrará así en el menú del sub-bot 🌸`, subbotKey)
         }
 
-        // ==================== #setbanner (cambiar banner del sub-bot) ====================
+        // ==================== #setbanner ====================
         if (cmd === 'setbanner') {
             const miSubbot = Object.entries(subbots).find(([, s]) => s.owner === sender)
 
@@ -216,7 +228,6 @@ export default {
                 return sendNino(conn, m, `❌ No tienes ningún sub-bot registrado.\n\nUsa *#code <número>* para vincular uno.`)
             }
 
-            // Detectar imagen: enviada directo o respondida
             const isImageMsg = m.message?.imageMessage
             const isQuotedImage = m.quoted?.message?.imageMessage
 
@@ -225,7 +236,6 @@ export default {
             }
 
             try {
-                // Baileys necesita el objeto completo { key, message }
                 const targetMsg = isImageMsg
                     ? { key: m.key, message: m.message }
                     : { key: m.quoted.key, message: m.quoted.message }
@@ -234,25 +244,46 @@ export default {
                     targetMsg,
                     'buffer',
                     {},
-                    { logger: { level: 'silent', child: () => ({ level: 'silent', info: ()=>{}, error: ()=>{}, warn: ()=>{}, debug: ()=>{}, trace: ()=>{} }) }, reuploadRequest: conn.updateMediaMessage }
+                    {
+                        logger: {
+                            level: 'silent', child: () => ({
+                                level: 'silent', info: () => {}, error: () => {},
+                                warn: () => {}, debug: () => {}, trace: () => {}
+                            })
+                        },
+                        reuploadRequest: conn.updateMediaMessage
+                    }
                 )
 
-                // Guardar como URL base64
+                // ✅ Guardar como base64 en DB (para persistencia)
                 const base64 = `data:image/jpeg;base64,${buffer.toString('base64')}`
 
                 if (isOwner && !miSubbot) {
-                    // Solo cambia el banner del bot principal, no el del subbot
-                    global.banner = base64
-                    // También guardarlo en db.settings para que persista
+                    // ✅ Bot principal: guardar base64 en DB y buffer en memoria
                     if (!db.settings) db.settings = {}
                     db.settings.banner = base64
+                    global.banner = base64
+
+                    // ✅ Actualizar cache con el buffer nuevo
+                    bannerCache.set('main', buffer)
+
                     return sendNino(conn, m, `✅ Banner del bot principal actualizado 🌸`)
                 }
 
                 const [subbotKey] = miSubbot
-                // Guardar solo en el subbot, nunca tocar global.banner
+
+                // ✅ Sub-bot: guardar solo en su entrada de DB
                 subbots[subbotKey].banner = base64
-                return sendNino(conn, m, `✅ Banner del sub-bot actualizado 🌸`)
+
+                // ✅ Actualizar cache del subbot con el buffer nuevo
+                bannerCache.set(subbotKey, buffer)
+
+                // ✅ Actualizar global.banner si este subbot está activo ahora
+                if (global._currentSubbotId === subbotKey) {
+                    global.banner = base64
+                }
+
+                return sendNino(conn, m, `✅ Banner del sub-bot actualizado 🌸`, subbotKey)
 
             } catch (e) {
                 console.error('[SETBANNER ERROR]', e)
@@ -260,7 +291,7 @@ export default {
             }
         }
 
-        // ==================== #delsubbot (eliminar sub-bot) ====================
+        // ==================== #delsubbot ====================
         if (cmd === 'delsubbot') {
             const numArg = (text || '').replace(/\D/g, '')
 
@@ -276,15 +307,14 @@ export default {
 
             const [subbotKey, subbotData] = entrada
 
-            // Solo el owner del subbot o el owner principal puede eliminarlo
             if (subbotData.owner !== sender && !isOwner) {
                 return sendNino(conn, m, `❌ Solo el dueño de ese sub-bot o el owner puede eliminarlo.`)
             }
 
-            // Desconectar si está activo
-            try {
-                await stopSubBot(subbotKey)
-            } catch {}
+            try { await stopSubBot(subbotKey) } catch {}
+
+            // ✅ Limpiar cache del banner al eliminar
+            bannerCache.delete(subbotKey)
 
             delete subbots[subbotKey]
 
