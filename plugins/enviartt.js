@@ -66,16 +66,56 @@ let handler = async (m, { conn, args }) => {
         const JID_CANAL = global.newsletterJid || CANAL_JID
         const canalNombre = global.newsletterName || 'Canal de Nino'
 
-        // Descargar video de TikTok
-        const res = await fetch(
-            'https://rest.apicausas.xyz/api/v1/descargas/tiktok?url=' + encodeURIComponent(url) + '&apikey=' + API_KEY
-        )
-        const json = await res.json()
+        // Descargar video de TikTok - multiples APIs con fallback
+        let videoUrl = null
+        let autor = 'Desconocido'
+        let titulo = ''
 
-        if (!json.status) throw new Error('La API de TikTok no respondio correctamente.')
+        const tiktokApis = [
+            async () => {
+                // GiftedTech TikTok
+                const r = await fetch('https://api.giftedtech.co.ke/api/download/tiktok?apikey=Fedex&url=' + encodeURIComponent(url))
+                const j = await r.json()
+                const d = j?.result || j?.data
+                if (!d) throw new Error('Sin resultado')
+                autor  = d.author || d.username || d.autor || 'Desconocido'
+                titulo = d.title  || d.desc     || d.titulo || ''
+                return d.video?.noWatermark || d.video?.watermark || d.download?.url || d.url || d.videoUrl || null
+            },
+            async () => {
+                // AlyaBot TikTok
+                const r = await fetch('https://rest.alyabotpe.xyz/dl/tiktok?url=' + encodeURIComponent(url) + '&key=Duarte-zz12')
+                const j = await r.json()
+                if (!j?.status) throw new Error('Sin status')
+                autor  = j.data?.author || j.data?.username || 'Desconocido'
+                titulo = j.data?.title  || j.data?.desc || ''
+                return j.data?.download || j.data?.dl || j.data?.url || null
+            },
+            async () => {
+                // Tikwm API (publica)
+                const r = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url))
+                const j = await r.json()
+                if (j?.code !== 0) throw new Error('Tikwm error')
+                autor  = j.data?.author?.unique_id || 'Desconocido'
+                titulo = j.data?.title || ''
+                return j.data?.play || j.data?.wmplay || null
+            }
+        ]
 
-        const videoUrl = json.data?.download?.url
-        if (!videoUrl) throw new Error('No se obtuvo URL de descarga.')
+        for (const apiFn of tiktokApis) {
+            try {
+                const link = await apiFn()
+                if (link && String(link).startsWith('http')) {
+                    videoUrl = link
+                    console.log('[ENVIARTT] API OK')
+                    break
+                }
+            } catch (e) {
+                console.log('[ENVIARTT] API fallo: ' + e.message)
+            }
+        }
+
+        if (!videoUrl) throw new Error('Ninguna API pudo descargar el video de TikTok.')
 
         await m.react('⬇️')
 
@@ -83,8 +123,6 @@ let handler = async (m, { conn, args }) => {
         if (!videoRes.ok) throw new Error('Error al descargar el video: HTTP ' + videoRes.status)
         const buffer = Buffer.from(await videoRes.arrayBuffer())
 
-        const autor  = json.data?.autor  || 'Desconocido'
-        const titulo = json.data?.titulo || ''
 
         // Enviar al canal
         await conn.sendMessage(JID_CANAL, {
