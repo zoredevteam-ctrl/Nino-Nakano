@@ -34,20 +34,14 @@ const log = {
 const n2 = chalk.hex('#FF69B4')
 const n3 = chalk.hex('#DA70D6')
 
-// ─── BANNER ──────────────────────────────────────────────────────────────────
+// ─── BANNER MÁS PEQUEÑO (adaptado para servidores/terminales) ─────────────────
 const ninoBanner = `
-${n3('🦋 ─────────────────────────────────────────────────────────────── 🦋')}
+${n3('🦋 ─────────────────────────────── 🦋')}
 
-${n2(' ███╗  ██╗██╗███╗  ██╗ ██████╗    ███╗  ██╗ █████╗ ██╗ ██╗ █████╗ ███╗  ██╗ ██████╗')}
-${n2(' ████╗ ██║██║████╗ ██║██╔══██╗    ████╗ ██║██╔══██╗██║██╔╝██╔══██╗████╗ ██║██╔═══██╗')}
-${n2(' ██╔██╗██║██║██╔██╗██║██║  ██║    ██╔██╗██║███████║█████╔╝ ███████║██╔██╗██║██║   ██║')}
-${n2(' ██║╚████║██║██║╚████║██║  ██║    ██║╚████║██╔══██║██╔═██╗ ██╔══██║██║╚████║██║   ██║')}
-${n2(' ██║ ╚███║██║██║ ╚███║╚██████╔╝   ██║ ╚███║██║  ██║██║  ██╗██║  ██║██║ ╚███║╚██████╔╝')}
-${n2(' ╚═╝  ╚══╝╚═╝╚═╝  ╚══╝ ╚═════╝   ╚═╝  ╚══╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚══╝ ╚═════╝')}
+${n2.bold('          N I N O   B O T')}
+${chalk.white.bold('   ✦  POWERED BY  𝓐𝓪𝓻𝓸𝓶  |  Z0RT SYSTEMS  ✦')}
 
-${chalk.white.bold('             ✦  POWERED BY  𝓐𝓪𝓻𝓸𝓶  |  Z0RT SYSTEMS  ✦')}
-
-${n3('🦋 ─────────────────────────────────────────────────────────────── 🦋')}
+${n3('🦋 ─────────────────────────────── 🦋')}
 `
 
 // ─── CARGA DE PLUGINS ─────────────────────────────────────────────────────────
@@ -59,7 +53,7 @@ async function loadPlugins() {
   for (const file of files) {
     try {
       const filePath = path.resolve(pluginsDir, file)
-      const plugin = (await import(`file://${filePath}?t=${Date.now()}`)).default
+      const plugin = (await import(`file://\( {filePath}?t= \){Date.now()}`)).default
       if (plugin) {
         plugins.set(file, plugin)
         log.success(`Cargado: ${file}`)
@@ -121,7 +115,7 @@ async function startBot() {
     if (!jid) return jid
     const decode = jidDecode(jid) || {}
     return (decode.user && decode.server)
-      ? `${decode.user}@${decode.server}`
+      ? `\( {decode.user}@ \){decode.server}`
       : jid
   }
 
@@ -170,7 +164,7 @@ async function startBot() {
     }
   })
 
-  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS ────────────────────────────────────────
+  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS (arregladas y más limpias) ─────────────
   conn.ev.on('group-participants.update', async anu => {
     try {
       const metadata = await conn.groupMetadata(anu.id)
@@ -184,17 +178,14 @@ async function startBot() {
         }
 
         if (anu.action === 'add') {
-          // 💖 Bienvenida cariñosa estilo Nino Nakano
+          // 💖 Bienvenida más corta, bonita y con estilo Nino
           const txt = [
-            `💐 ¡Bienvenid@ a *${metadata.subject}*, @${num.split('@')[0]}! 🎀`,
+            `💐 ¡Bienvenid@ a *\( {metadata.subject}*, @ \){num.split('@')[0]}! 🎀`,
             ``,
-            `Soy Nino... y aunque no suelo decir esto fácilmente...`,
-            `me alegra que estés aquí. 🌸`,
+            `Soy Nino\~ Me alegra mucho que estés aquí 🌸`,
+            `Espero que te sientas a gusto y lo pases genial con nosotros 💕`,
             ``,
-            `Espero que te sientas cómodo/a, que respetes a todos`,
-            `y que disfrutes mucho tu tiempo con nosotros. 💕`,
-            ``,
-            `*¡Bienvenid@ de verdad!* 🦋✨`
+            `*¡Bienvenid@ de verdad!* 🦋`
           ].join('\n')
 
           await conn.sendMessage(anu.id, {
@@ -213,12 +204,12 @@ async function startBot() {
           })
 
         } else if (anu.action === 'remove') {
-          // 🍂 Despedida amable (sin ser tan cruel)
+          // 🍂 Despedida más suave y corta
           const txt = [
-            `🍂 @${num.split('@')[0]} ha salido de *${metadata.subject}*.`,
+            `🍂 @\( {num.split('@')[0]} ha salido de * \){metadata.subject}*.`,
             ``,
-            `Fue bonito tenerte aquí mientras duró... 🌙`,
-            `Cuídate mucho donde vayas. Quizás nos volvamos a ver. 💫`
+            `Fue lindo tenerte aquí... Cuídate mucho donde vayas 💫`,
+            `¡Nos vemos pronto! 🌙`
           ].join('\n')
 
           await conn.sendMessage(anu.id, {
