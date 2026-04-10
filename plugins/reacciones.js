@@ -1,44 +1,33 @@
 /**
  * REACCIONES DE ANIME - NINO NAKANO
  * Comandos: #kiss #hug #push #dormir #triste #no #hola #borracho
- * API: nekos.best
- * Funciona solo o mencionando/respondiendo a alguien
+ * API: nekos.best — enviados como sticker animado (webp)
  */
 
-// ── Mapeo de comandos a endpoints de nekos.best ───────────────────────────────
 const ACCIONES = {
-    // Acción        endpoint        emoji   texto solo                          texto con target
-    kiss:     { ep: 'kiss',     emoji: '💋', solo: 'te manda un besito~',        target: 'le da un besito a' },
-    hug:      { ep: 'hug',      emoji: '🤗', solo: 'se abraza a sí mismo~',      target: 'abraza con cariño a' },
-    push:     { ep: 'poke',     emoji: '👉', solo: 'se empuja solo... raro~',    target: 'empuja a' },
-    dormir:   { ep: 'sleep',    emoji: '😴', solo: 'se quedó dormido~',          target: 'hace dormir a' },
-    triste:   { ep: 'cry',      emoji: '😢', solo: 'está llorando...',           target: 'llora por' },
-    no:       { ep: 'no',       emoji: '🙅', solo: 'dice que NO~',               target: 'le dice NO a' },
-    hola:     { ep: 'wave',     emoji: '👋', solo: 'saluda a todos~',            target: 'le saluda a' },
-    borracho: { ep: 'handshake',emoji: '🍺', solo: 'está bien borracho~',        target: 'bebe con' }
+    kiss:     { ep: 'kiss',      emoji: '💋', solo: 'se manda un besito~',       target: 'le da un besito a' },
+    hug:      { ep: 'hug',       emoji: '🤗', solo: 'se abraza a sí mismo~',     target: 'abraza con cariño a' },
+    push:     { ep: 'poke',      emoji: '👉', solo: 'se empuja solo... raro~',   target: 'empuja a' },
+    dormir:   { ep: 'sleep',     emoji: '😴', solo: 'se quedó dormido~',         target: 'hace dormir a' },
+    triste:   { ep: 'cry',       emoji: '😢', solo: 'está llorando...',          target: 'llora por' },
+    no:       { ep: 'no',        emoji: '🙅', solo: 'dice que NO~',              target: 'le dice NO a' },
+    hola:     { ep: 'wave',      emoji: '👋', solo: 'saluda a todos~',           target: 'le saluda a' },
+    borracho: { ep: 'handshake', emoji: '🍺', solo: 'está bien borracho~',       target: 'bebe con' }
 }
 
-// Comandos alternativos
 const ALIASES = {
-    beso: 'kiss',
-    abrazo: 'hug',
-    empujar: 'push',
-    sleep: 'dormir',
-    sad: 'triste',
-    llorar: 'triste',
-    hello: 'hola',
-    saludar: 'hola',
-    drunk: 'borracho',
-    nope: 'no'
+    beso: 'kiss', abrazo: 'hug', empujar: 'push',
+    sleep: 'dormir', sad: 'triste', llorar: 'triste',
+    hello: 'hola', saludar: 'hola', drunk: 'borracho', nope: 'no'
 }
 
 const fetchGif = async (endpoint) => {
     const res = await fetch(`https://nekos.best/api/v2/${endpoint}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const json = await res.json()
-    const data = json.results?.[0]
-    if (!data?.url) throw new Error('Sin resultados')
-    return data.url
+    const url = json.results?.[0]?.url
+    if (!url) throw new Error('Sin resultados')
+    return url
 }
 
 const _getBannerBuffer = async () => {
@@ -51,9 +40,8 @@ const _getBannerBuffer = async () => {
     } catch { return null }
 }
 
-let handler = async (m, { conn, command, text }) => {
-    // Resolver comando real (alias → comando base)
-    const cmd = ALIASES[command.toLowerCase()] || command.toLowerCase()
+let handler = async (m, { conn, command }) => {
+    const cmd    = ALIASES[command.toLowerCase()] || command.toLowerCase()
     const accion = ACCIONES[cmd]
     if (!accion) return
 
@@ -72,13 +60,9 @@ let handler = async (m, { conn, command, text }) => {
     const senderName = m.pushName || 'Alguien'
     const botName    = global.botName || 'Nino Nakano'
 
-    // ── Armar texto de la acción ──────────────────────────────────────────────
-    let textoAccion
-    if (targetJid) {
-        textoAccion = `*${senderName}* ${accion.target} *${targetName}* ${accion.emoji}`
-    } else {
-        textoAccion = `*${senderName}* ${accion.solo} ${accion.emoji}`
-    }
+    const textoAccion = targetJid
+        ? `*${senderName}* ${accion.target} *${targetName}* ${accion.emoji}`
+        : `*${senderName}* ${accion.solo} ${accion.emoji}`
 
     await m.react(accion.emoji)
 
@@ -86,18 +70,12 @@ let handler = async (m, { conn, command, text }) => {
         const gifUrl = await fetchGif(accion.ep)
 
         const imgRes = await fetch(gifUrl)
-        if (!imgRes.ok) throw new Error(`No se pudo descargar el GIF: HTTP ${imgRes.status}`)
+        if (!imgRes.ok) throw new Error(`HTTP ${imgRes.status}`)
         const buffer = Buffer.from(await imgRes.arrayBuffer())
 
-        const caption =
-            `${accion.emoji} ${textoAccion}\n\n` +
-            `> _${botName}_ 🦋`
-
+        // ✅ Primero enviar el texto con el contexto
         await conn.sendMessage(m.chat, {
-            video: buffer,
-            caption,
-            mimetype: 'video/mp4',
-            gifPlayback: true,
+            text: `${textoAccion}\n\n> _${botName}_ 🦋`,
             contextInfo: {
                 mentionedJid: targetJid ? [targetJid] : [],
                 externalAdReply: {
@@ -110,6 +88,11 @@ let handler = async (m, { conn, command, text }) => {
                 }
             }
         }, { quoted: m })
+
+        // ✅ Luego enviar el GIF como sticker animado — se ve perfecto en WhatsApp
+        await conn.sendMessage(m.chat, {
+            sticker: buffer
+        })
 
     } catch (e) {
         console.error(`[REACCION ${cmd.toUpperCase()} ERROR]`, e)
