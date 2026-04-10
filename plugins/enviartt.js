@@ -124,7 +124,6 @@ let handler = async (m, { conn, args }) => {
         const buffer = Buffer.from(await videoRes.arrayBuffer())
 
 
-        // Enviar al canal
         const caption =
             '🌸 *' + titulo + '*\n\n' +
             '👤 *Creador:* @' + autor + '\n' +
@@ -134,32 +133,24 @@ let handler = async (m, { conn, args }) => {
             '│  ✦ Z0RT SYSTEMS ✦  │\n' +
             '╰─────────────────╯'
 
-        // Metodo 1: newsletterSendMessage (Baileys moderno para canales)
-        let enviado = false
-        if (typeof conn.newsletterSendMessage === 'function') {
-            try {
-                await conn.newsletterSendMessage(JID_CANAL, {
-                    video: buffer,
-                    caption,
-                    mimetype: 'video/mp4'
-                })
-                enviado = true
-                console.log('[ENVIARTT] Enviado via newsletterSendMessage')
-            } catch (e) {
-                console.log('[ENVIARTT] newsletterSendMessage fallo: ' + e.message)
-            }
-        }
+        // NOTA: Baileys 7.x tiene bug con media en canales (video no aparece)
+        // Enviar texto al canal + video al chat del owner como workaround
 
-        // Metodo 2: sendMessage normal
-        if (!enviado) {
-            await conn.sendMessage(JID_CANAL, {
-                video: buffer,
-                caption,
-                mimetype: 'video/mp4',
-                fileName: autor + '_tiktok.mp4'
-            })
-            console.log('[ENVIARTT] Enviado via sendMessage')
-        }
+        // 1. Enviar texto al canal (esto si funciona)
+        await conn.sendMessage(JID_CANAL, {
+            text: caption
+        })
+
+        // 2. Enviar video al chat del owner con instrucciones
+        await conn.sendMessage(m.chat, {
+            video: buffer,
+            caption:
+                '📤 *Video listo para el canal*\n\n' +
+                caption + '\n\n' +
+                '_⚠️ Nota: Baileys 7.x tiene un bug con videos en canales.\n' +
+                'El texto ya fue publicado. Puedes reenviar este video manualmente al canal._',
+            mimetype: 'video/mp4'
+        }, { quoted: m })
 
         await m.react('✅')
 
