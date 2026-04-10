@@ -125,19 +125,41 @@ let handler = async (m, { conn, args }) => {
 
 
         // Enviar al canal
-        await conn.sendMessage(JID_CANAL, {
-            video: buffer,
-            caption:
-                '🌸 *' + titulo + '*\n\n' +
-                '👤 *Creador:* @' + autor + '\n' +
-                '🔗 *Fuente:* TikTok\n\n' +
-                '╭─────────────────╮\n' +
-                '│  🦋 *' + (global.botName || 'Nino Nakano') + '*  │\n' +
-                '│  ✦ Z0RT SYSTEMS ✦  │\n' +
-                '╰─────────────────╯',
-            mimetype: 'video/mp4',
-            fileName: autor + '_tiktok.mp4'
-        })
+        const caption =
+            '🌸 *' + titulo + '*\n\n' +
+            '👤 *Creador:* @' + autor + '\n' +
+            '🔗 *Fuente:* TikTok\n\n' +
+            '╭─────────────────╮\n' +
+            '│  🦋 *' + (global.botName || 'Nino Nakano') + '*  │\n' +
+            '│  ✦ Z0RT SYSTEMS ✦  │\n' +
+            '╰─────────────────╯'
+
+        // Metodo 1: newsletterSendMessage (Baileys moderno para canales)
+        let enviado = false
+        if (typeof conn.newsletterSendMessage === 'function') {
+            try {
+                await conn.newsletterSendMessage(JID_CANAL, {
+                    video: buffer,
+                    caption,
+                    mimetype: 'video/mp4'
+                })
+                enviado = true
+                console.log('[ENVIARTT] Enviado via newsletterSendMessage')
+            } catch (e) {
+                console.log('[ENVIARTT] newsletterSendMessage fallo: ' + e.message)
+            }
+        }
+
+        // Metodo 2: sendMessage normal
+        if (!enviado) {
+            await conn.sendMessage(JID_CANAL, {
+                video: buffer,
+                caption,
+                mimetype: 'video/mp4',
+                fileName: autor + '_tiktok.mp4'
+            })
+            console.log('[ENVIARTT] Enviado via sendMessage')
+        }
 
         await m.react('✅')
 
