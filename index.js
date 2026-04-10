@@ -33,16 +33,34 @@ const log = {
 
 const n2 = chalk.hex('#FF69B4')
 const n3 = chalk.hex('#DA70D6')
+const n4 = chalk.hex('#C77DFF')
 
-// ─── BANNER MÁS PEQUEÑO (adaptado para servidores/terminales) ─────────────────
+// ─── BANNER (adaptado para cualquier terminal) ────────────────────────────────
 const ninoBanner = `
-${n3('🦋 ─────────────────────────────── 🦋')}
-
-${n2.bold('          N I N O   B O T')}
-${chalk.white.bold('   ✦  POWERED BY  𝓐𝓪𝓻𝓸𝓶  |  Z0RT SYSTEMS  ✦')}
-
-${n3('🦋 ─────────────────────────────── 🦋')}
+${n3('╔══════════════════════════════════════════════╗')}
+${n3('║')}  ${n2('███╗   ██╗██╗███╗   ██╗ ██████╗')}             ${n3('║')}
+${n3('║')}  ${n2('████╗  ██║██║████╗  ██║██╔═══██╗')}            ${n3('║')}
+${n3('║')}  ${n2('██╔██╗ ██║██║██╔██╗ ██║██║   ██║')}            ${n3('║')}
+${n3('║')}  ${n2('██║╚██╗██║██║██║╚██╗██║██║   ██║')}            ${n3('║')}
+${n3('║')}  ${n2('██║ ╚████║██║██║ ╚████║╚██████╔╝')}            ${n3('║')}
+${n3('║')}  ${n2('╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝')}            ${n3('║')}
+${n3('║')}                                              ${n3('║')}
+${n3('║')}  ${n4('✦ N A K A N O  B O T  S Y S T E M S ✦')}      ${n3('║')}
+${n3('║')}  ${chalk.white.bold('  Powered by  𝓐𝓪𝓻𝓸𝓶  |  Z0RT SYSTEMS  ')}     ${n3('║')}
+${n3('║')}  ${chalk.gray('  Version: ' + (global.botVersion || '1.0.5') + ' | Baileys 7.0.0-rc.9   ')}     ${n3('║')}
+${n3('╚══════════════════════════════════════════════╝')}
 `
+
+// ─── HELPER: Banner como Buffer ───────────────────────────────────────────────
+const getBannerBuffer = async () => {
+  try {
+    const src = global.banner || ''
+    if (!src) return null
+    if (src.startsWith('data:image')) return Buffer.from(src.split(',')[1], 'base64')
+    const res = await fetch(src)
+    return Buffer.from(await res.arrayBuffer())
+  } catch { return null }
+}
 
 // ─── CARGA DE PLUGINS ─────────────────────────────────────────────────────────
 const plugins = new Map()
@@ -53,7 +71,7 @@ async function loadPlugins() {
   for (const file of files) {
     try {
       const filePath = path.resolve(pluginsDir, file)
-      const plugin = (await import(`file://\( {filePath}?t= \){Date.now()}`)).default
+      const plugin = (await import(`file://${filePath}?t=${Date.now()}`)).default
       if (plugin) {
         plugins.set(file, plugin)
         log.success(`Cargado: ${file}`)
@@ -115,7 +133,7 @@ async function startBot() {
     if (!jid) return jid
     const decode = jidDecode(jid) || {}
     return (decode.user && decode.server)
-      ? `\( {decode.user}@ \){decode.server}`
+      ? `${decode.user}@${decode.server}`
       : jid
   }
 
@@ -138,7 +156,7 @@ async function startBot() {
     }, 3000)
   }
 
-  // Eventos de conexión
+  // ─── EVENTOS DE CONEXIÓN ──────────────────────────────────────────────────
   conn.ev.on('connection.update', async update => {
     const { qr, connection, lastDisconnect } = update
 
@@ -164,28 +182,38 @@ async function startBot() {
     }
   })
 
-  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS (arregladas y más limpias) ─────────────
+  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS ────────────────────────────────────
   conn.ev.on('group-participants.update', async anu => {
     try {
       const metadata = await conn.groupMetadata(anu.id)
 
+      // ✅ Verificar si el grupo tiene bienvenidas desactivadas
+      const groupData = database.data?.groups?.[anu.id]
+      if (groupData?.noWelcome) return
+
       for (const num of anu.participants) {
-        let ppuser
+        // ✅ Obtener foto de perfil del usuario
+        let ppBuffer = null
         try {
-          ppuser = await conn.profilePictureUrl(num, 'image')
+          const ppUrl = await conn.profilePictureUrl(num, 'image')
+          const ppRes = await fetch(ppUrl)
+          ppBuffer = Buffer.from(await ppRes.arrayBuffer())
         } catch {
-          ppuser = global.banner || ''
+          // Si no tiene foto, usar el banner del bot como fallback
+          ppBuffer = await getBannerBuffer()
         }
 
         if (anu.action === 'add') {
-          // 💖 Bienvenida más corta, bonita y con estilo Nino
           const txt = [
-            `💐 ¡Bienvenid@ a *\( {metadata.subject}*, @ \){num.split('@')[0]}! 🎀`,
+            `💐 ¡Bienvenid@ a *${metadata.subject}*, @${num.split('@')[0]}! 🎀`,
             ``,
-            `Soy Nino\~ Me alegra mucho que estés aquí 🌸`,
-            `Espero que te sientas a gusto y lo pases genial con nosotros 💕`,
+            `Soy Nino... y aunque no suelo decir esto fácilmente...`,
+            `me alegra que estés aquí. 🌸`,
             ``,
-            `*¡Bienvenid@ de verdad!* 🦋`
+            `Espero que te sientas cómodo/a, que respetes a todos`,
+            `y que disfrutes mucho tu tiempo con nosotros. 💕`,
+            ``,
+            `*¡Bienvenid@ de verdad!* 🦋✨`
           ].join('\n')
 
           await conn.sendMessage(anu.id, {
@@ -195,7 +223,8 @@ async function startBot() {
               externalAdReply: {
                 title: '🌸 ¡Nuevo integrante! 🌸',
                 body: `Bienvenido/a a ${metadata.subject}`,
-                thumbnailUrl: ppuser,
+                // ✅ thumbnail como Buffer — funciona con foto de perfil y banner
+                thumbnail: ppBuffer,
                 sourceUrl: global.rcanal || '',
                 mediaType: 1,
                 renderLargerThumbnail: true
@@ -204,12 +233,11 @@ async function startBot() {
           })
 
         } else if (anu.action === 'remove') {
-          // 🍂 Despedida más suave y corta
           const txt = [
-            `🍂 @\( {num.split('@')[0]} ha salido de * \){metadata.subject}*.`,
+            `🍂 @${num.split('@')[0]} ha salido de *${metadata.subject}*.`,
             ``,
-            `Fue lindo tenerte aquí... Cuídate mucho donde vayas 💫`,
-            `¡Nos vemos pronto! 🌙`
+            `Fue bonito tenerte aquí mientras duró... 🌙`,
+            `Cuídate mucho donde vayas. Quizás nos volvamos a ver. 💫`
           ].join('\n')
 
           await conn.sendMessage(anu.id, {
@@ -219,7 +247,7 @@ async function startBot() {
               externalAdReply: {
                 title: '🍂 Hasta pronto...',
                 body: `Se fue de ${metadata.subject}`,
-                thumbnailUrl: ppuser,
+                thumbnail: ppBuffer,
                 sourceUrl: global.rcanal || '',
                 mediaType: 1,
                 renderLargerThumbnail: true
@@ -233,7 +261,7 @@ async function startBot() {
     }
   })
 
-  // Procesamiento de mensajes
+  // ─── PROCESAMIENTO DE MENSAJES ────────────────────────────────────────────
   conn.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     const m = messages[0]
@@ -248,10 +276,8 @@ async function startBot() {
 
 // ─── ARRANQUE ────────────────────────────────────────────────────────────────
 ;(async () => {
-  // ✅ Cargar base de datos primero
   await database.read()
 
-  // ✅ Restaurar prefijo y banner guardados si existen
   if (database.data?.settings?.prefix) global.prefix = database.data.settings.prefix
   if (database.data?.settings?.banner) global.banner = database.data.settings.banner
 
@@ -259,6 +285,5 @@ async function startBot() {
   global.plugins = plugins
   await startBot()
 
-  // ✅ Reconectar sub-bots guardados al arrancar
   await reconnectAllSubBots(database.data)
 })()
