@@ -1,263 +1,233 @@
-import { downloadContentFromMessage } from '@whiskeysockets/baileys'
-import { exec } from 'child_process'
-import { promisify } from 'util'
-import fs from 'fs'
-import path from 'path'
-import os from 'os'
+import { database } from '../lib/database.js'
 
-const execAsync = promisify(exec)
-const RCANAL = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
-
-const downloadMedia = async (msg, mtype) => {
-    const mediaType = mtype.replace('Message', '')
-    const stream = await downloadContentFromMessage(msg, mediaType)
-    const chunks = []
-    for await (const chunk of stream) chunks.push(chunk)
-    return Buffer.concat(chunks)
-}
-
-// Imagen a webp - sin parentesis en el filtro para compatibilidad con sh
-const imageToWebp = async (buffer) => {
-    const tmpIn  = path.join(os.tmpdir(), 'nino_in_'  + Date.now() + '.jpg')
-    const tmpOut = path.join(os.tmpdir(), 'nino_out_' + Date.now() + '.webp')
+// ✅ Convierte banner (URL o base64) a Buffer para thumbnail
+const getBannerBuffer = async (bannerSrc) => {
+    if (!bannerSrc) return null
     try {
-        fs.writeFileSync(tmpIn, buffer)
-        // Usar scale simple sin pad para evitar el error de parentesis
-        await execAsync(
-            'ffmpeg -y -i "' + tmpIn + '"' +
-            ' -vf "scale=512:512:force_original_aspect_ratio=decrease"' +
-            ' -c:v libwebp -quality 80' +
-            ' "' + tmpOut + '"'
-        )
-        return fs.readFileSync(tmpOut)
-    } finally {
-        try { fs.unlinkSync(tmpIn) } catch {}
-        try { fs.unlinkSync(tmpOut) } catch {}
-    }
-}
-
-// Video/gif a webp ANIMADO
-const videoToWebp = async (buffer) => {
-    const tmpIn  = path.join(os.tmpdir(), 'nino_in_'  + Date.now() + '.mp4')
-    const tmpOut = path.join(os.tmpdir(), 'nino_out_' + Date.now() + '.webp')
-    try {
-        fs.writeFileSync(tmpIn, buffer)
-        // Comando probado para webp animado - sin parentesis
-        await execAsync(
-            'ffmpeg -y -i "' + tmpIn + '"' +
-            ' -vf "scale=512:512:force_original_aspect_ratio=decrease,fps=15"' +
-            ' -vcodec libwebp' +
-            ' -lossless 0' +
-            ' -compression_level 6' +
-            ' -q:v 50' +
-            ' -loop 0' +
-            ' -preset picture' +
-            ' -an' +
-            ' -t 8' +
-            ' "' + tmpOut + '"'
-        )
-        return fs.readFileSync(tmpOut)
-    } finally {
-        try { fs.unlinkSync(tmpIn) } catch {}
-        try { fs.unlinkSync(tmpOut) } catch {}
-    }
-}
-
-// Agregar metadata EXIF al webp (info del pack visible en WhatsApp)
-const addExif = async (webpBuffer, packName, authorName) => {
-    try {
-        // Construir el EXIF manualmente con el JSON de WhatsApp
-        const json = JSON.stringify({
-            'sticker-pack-id': 'nino_' + Date.now(),
-            'sticker-pack-name': packName,
-            'sticker-pack-publisher': authorName,
-            'emojis': ['🦋']
-        })
-
-        const jsonBuf = Buffer.from(json, 'utf8')
-
-        // Header EXIF para WebP
-        const exifHeader = Buffer.from([
-            0x49, 0x49, 0x2A, 0x00, // TIFF header little-endian
-            0x08, 0x00, 0x00, 0x00, // Offset al primer IFD
-            0x01, 0x00,             // Numero de entradas IFD
-            0x41, 0x57,             // Tag 0x5741 = 'WA'
-            0x07, 0x00              // Tipo: UNDEFINED
-        ])
-
-        const sizeBuf = Buffer.alloc(4)
-        sizeBuf.writeUInt32LE(jsonBuf.length, 0)
-
-        const exifData = Buffer.concat([exifHeader, sizeBuf, jsonBuf])
-
-        // Insertar en el WebP
-        // WebP tiene formato: RIFF????WEBP + chunks
-        // Agregar chunk EXIF
-        if (webpBuffer.slice(0, 4).toString() !== 'RIFF') {
-            return webpBuffer
+        if (bannerSrc.startsWith('data:image')) {
+            const base64Data = bannerSrc.split(',')[1]
+            return Buffer.from(base64Data, 'base64')
         }
-
-        const exifChunkName = Buffer.from('EXIF')
-        const exifChunkSize = Buffer.alloc(4)
-        exifChunkSize.writeUInt32LE(exifData.length, 0)
-
-        // Marcar el archivo WebP como que tiene EXIF en el byte de flags
-        const result = Buffer.concat([
-            webpBuffer,
-            exifChunkName,
-            exifChunkSize,
-            exifData
-        ])
-
-        // Actualizar el tamaño RIFF
-        result.writeUInt32LE(result.length - 8, 4)
-
-        return result
+        const res = await fetch(bannerSrc)
+        if (!res.ok) return null
+        return Buffer.from(await res.arrayBuffer())
     } catch {
-        return webpBuffer
+        return null
     }
 }
 
-let handler = async (m, { conn, text }) => {
-    const nombreBot = global.botName || 'Nino Nakano'
-    const canalLink = global.rcanal || RCANAL
-    const bannerUrl = global.banner || ''
+let handler = async (m, { conn, usedPrefix }) => {
+    // ✅ FIX: algunos usuarios tienen sender con :XX que no matchea en la DB
+    // Normalizamos el sender igual que el handler principal
+    const rawSender = m.sender || ''
+    const sender = rawSender.replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
 
-    const sendNino = async (txt) => {
-        let thumbBuf = null
+    try {
+        const prefix   = usedPrefix || global.prefix || '#'
+        const username = m.pushName || 'Tesoro'
+        const nombreBot = global.botName || 'Nino Nakano'
+        const canalLink = global.rcanal || ''
+
+        // Saludo según hora
+        const hora = new Date().getHours()
+        let saludo
+        if (hora >= 5 && hora < 12)       saludo = 'Buenos días ☀️'
+        else if (hora >= 12 && hora < 18) saludo = 'Buenas tardes 🌸'
+        else if (hora >= 18 && hora < 22) saludo = 'Buenas noches 🌙'
+        else                               saludo = 'Te veo de nuevo 🦋'
+
+        // Detectar si es sub-bot o bot principal
+        const esSubbot = !!global._currentSubbotId
+        const saludoBot = esSubbot
+            ? `🤖 Hola *${username}*! Soy *${nombreBot}*, tu Sub-Bot de confianza~\n${saludo}, espero disfrutes todos mis comandos 💕`
+            : `💎 Hola *${username}*! Soy *${nombreBot}* Premium Bot~\n${saludo}, espero disfrutes mis nuevos comandos 🌸`
+
+        // Ping / Latencia
+        const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
+        const p = `${Math.abs(Date.now() - timestamp)}ms`
+
+        // Uptime
+        const uptimeSeconds = process.uptime()
+        const d   = Math.floor(uptimeSeconds / 86400)
+        const h   = Math.floor((uptimeSeconds % 86400) / 3600)
+        const min = Math.floor((uptimeSeconds % 3600) / 60)
+        const s   = Math.floor(uptimeSeconds % 60)
+        const uptime = `${d}d ${h}h ${min}m ${s}s`
+
+        // ✅ getUser con sender normalizado — crea usuario si no existe
+        const user     = database.getUser(sender)
+        const users    = database.data?.users || {}
+        const totalreg = Object.keys(users).length
+
+        const userMoney = user.limit ?? 0
+        const userExp   = user.xp ?? user.exp ?? 0
+        const userLevel = user.level ?? 1
+        const rpg       = user.rpg || null
+
+        // Sub-bots activos
+        const subbots      = database.data?.subbots || {}
+        const totalSubbots = Object.keys(subbots).filter(k => subbots[k]?.connected).length
+
+        // Rangos
+        const getRango = (level) => {
+            if (level < 5)  return 'Novato 🐣'
+            if (level < 15) return 'Aprendiz 🦋'
+            if (level < 30) return 'Guerrero ⚔️'
+            if (level < 50) return 'Élite 🎖️'
+            return 'Nino Lover 💖'
+        }
+        const rango = getRango(userLevel)
+
+        // Ranking seguro
+        let rankText = '---'
         try {
-            const r = await fetch(bannerUrl || 'https://causas-files.vercel.app/fl/cyns.png')
-            thumbBuf = Buffer.from(await r.arrayBuffer())
+            const sortedExp  = Object.entries(users).sort((a, b) => (b[1]?.xp || b[1]?.exp || 0) - (a[1]?.xp || a[1]?.exp || 0))
+            const rankIndex  = sortedExp.findIndex(u => u[0] === sender) + 1
+            rankText = rankIndex > 0 ? `${rankIndex} / ${totalreg}` : '---'
         } catch {}
-        return conn.sendMessage(m.chat, {
+
+        const txt =
+`${saludoBot}
+
+> ꒰⌢ ʚ˚₊‧ ✎ ꒱ INFO:
+- Este es un sistema privado creado con mucho cariño por *𝓐𝓪𝓻𝓸𝓶*.
+
+*╭╼𝅄꒰𑁍⃪⃪࣭۪ٜ݊݊݊໑ ꒱ 𐔌 ESTADÍSTICAS 𐦯*
+*|✎ Creador:* 𝓐𝓪𝓻𝓸𝓶
+*|✎ Usuarios:* ${totalreg.toLocaleString()}
+*|✎ Activo:* ${uptime}
+*|✎ Latencia:* ${p}
+*|✎ Canal:* ${canalLink}
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🦋◌⃘⃪۪𐇽֟፝۫۬🦋◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+
+*╭╼𝅄꒰✧: ꒱ 𐔌 TU PERFIL 𐦯*
+*|✎ Nombre:* ${username}
+*|✎ Diamantes:* ${userMoney} 💎
+*|✎ Experiencia:* ${userExp} ✨
+*|✎ Rango:* ${rango}
+*|✎ Nivel:* ${userLevel}
+*|✎ Ranking:* ${rankText}
+${rpg?.clase ? `*|✎ Clase RPG:* ${rpg.clase} Nv.${rpg.nivel} ⚔️` : '*|✎ RPG:* Sin clase — usa #elegirclase'}
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ🎀◌⃘⃪۪𐇽֟፝۫۬🎀◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+
+*╭╼𝅄꒰👑꒱ 𐔌 SUB-BOTS 𐦯*
+*|✎ Conectados:* ${totalSubbots} / 30
+*|✎ Vincular:* ${prefix}code
+*|✎ Ver lista:* ${prefix}subbots
+*╰─ׅ─ׅ┈ ─๋︩︪─☪︎︎︎̸⃘̸࣭ٜ👑◌⃘⃪۪𐇽֟፝۫۬👑◌⃘࣭☪︎︎︎︎̸─ׅ─ׅ┈ ─๋︩︪─╯*
+
+*➪ 𝗟𝗜𝗦𝗧𝗔 𝗗𝗘 𝗙𝗨𝗡𝗖𝗜𝗢𝗡𝗘𝗦*
+_Aquí tienes todo lo que puedo hacer por ti:_
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SISTEMA 𐦯*
+> *✧･ﾟ: ❏ ${prefix}ping*
+> *✧･ﾟ: ❏ ${prefix}update / ${prefix}restart*
+> *✧･ﾟ: ❏ ${prefix}checkplugins*
+> *✧･ﾟ: ❏ ${prefix}owner*
+> *✧･ﾟ: ❏ ${prefix}infobot*
+> *✧･ﾟ: ❏ ${prefix}setprefix / ${prefix}delprefix*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 MODERACIÓN 🛡️*
+> *✧･ﾟ: ❏ ${prefix}warn / ${prefix}resetwarn / ${prefix}warns*
+> *✧･ﾟ: ❏ ${prefix}mute [tiempo] / ${prefix}unmute*
+> *✧･ﾟ: ❏ ${prefix}closegroup / ${prefix}opengroup*
+> *✧･ﾟ: ❏ ${prefix}antilink / ${prefix}antispam*
+> *✧･ﾟ: ❏ ${prefix}setprimary / ${prefix}removeprimary*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 GRUPOS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}kick / ${prefix}ban*
+> *✧･ﾟ: ❏ ${prefix}tag*
+> *✧･ﾟ: ❏ ${prefix}promover / ${prefix}degradar*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ECONOMÍA 𐦯*
+> *✧･ﾟ: ❏ ${prefix}daily / ${prefix}cofre*
+> *✧･ﾟ: ❏ ${prefix}minar / ${prefix}work / ${prefix}chamba*
+> *✧･ﾟ: ❏ ${prefix}crime / ${prefix}rob / ${prefix}rob2*
+> *✧･ﾟ: ❏ ${prefix}bal / ${prefix}baltop*
+> *✧･ﾟ: ❏ ${prefix}shop / ${prefix}depositar / ${prefix}lvl*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 RPG 𐦯*
+> *✧･ﾟ: ❏ ${prefix}clases / ${prefix}elegirclase*
+> *✧･ﾟ: ❏ ${prefix}perfil / ${prefix}dungeon*
+> *✧･ﾟ: ❏ ${prefix}atacar / ${prefix}habilidad*
+> *✧･ﾟ: ❏ ${prefix}curar / ${prefix}inventario / ${prefix}usar*
+> *✧･ﾟ: ❏ ${prefix}pelear / ${prefix}tiendarpg*
+> *✧･ﾟ: ❏ ${prefix}clan / ${prefix}misiones / ${prefix}reclamar*
+> *✧･ﾟ: ❏ ${prefix}rpgtop*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 ANIME & SOCIAL 🎀*
+> *✧･ﾟ: ❏ ${prefix}rw / ${prefix}miswaifu*
+> *✧･ﾟ: ❏ ${prefix}kiss / ${prefix}hug / ${prefix}kill*
+> *✧･ﾟ: ❏ ${prefix}push / ${prefix}dormir / ${prefix}triste*
+> *✧･ﾟ: ❏ ${prefix}no / ${prefix}hola / ${prefix}borracho*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 HERRAMIENTAS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}clima <ciudad>*
+> *✧･ﾟ: ❏ ${prefix}traducir <idioma> <texto>*
+> *✧･ﾟ: ❏ ${prefix}calc <operación>*
+> *✧･ﾟ: ❏ ${prefix}qr <texto>*
+> *✧･ﾟ: ❏ ${prefix}acortar <url>*
+> *✧･ﾟ: ❏ ${prefix}ip <dirección>*
+> *✧･ﾟ: ❏ ${prefix}color <hex>*
+> *✧･ﾟ: ❏ ${prefix}moneda <cant> <de> <a>*
+> *✧･ﾟ: ❏ ${prefix}dado / ${prefix}cara*
+> *✧･ﾟ: ❏ ${prefix}wiki <tema>*
+> *✧･ﾟ: ❏ ${prefix}letra <canción>*
+> *✧･ﾟ: ❏ ${prefix}password / ${prefix}timestamp*
+> *✧･ﾟ: ❏ ${prefix}base64 / ${prefix}binario / ${prefix}hex*
+> *✧･ﾟ: ❏ ${prefix}checkurl / ${prefix}ascii*
+> *✧･ﾟ: ❏ ${prefix}pokedex <nombre>*
+> *✧･ﾟ: ❏ ${prefix}chiste / ${prefix}frase*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 DESCARGAS 🎵*
+> *✧･ﾟ: ❏ ${prefix}play <canción>*
+> *✧･ﾟ: ❏ ${prefix}playvid <canción>*
+> *✧･ﾟ: ❏ ${prefix}pin <búsqueda o url>*
+> *✧･ﾟ: ❏ ${prefix}enviartt <url tiktok>*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 STICKERS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}s / ${prefix}sticker*
+
+*꒰⌢◌⃘࣭ ♡  ꒱ 𐔌 SUB-BOTS 𐦯*
+> *✧･ﾟ: ❏ ${prefix}code <número>*
+> *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
+> *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
+
+        // ✅ Leer banner justo antes de enviar
+        const bannerSrc = global.banner || ''
+        const thumbnail = await getBannerBuffer(bannerSrc)
+
+        await conn.sendMessage(m.chat, {
             text: txt,
             contextInfo: {
                 isForwarded: true,
                 forwardedNewsletterMessageInfo: {
                     newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
                     serverMessageId: '',
-                    newsletterName: global.newsletterName || nombreBot
+                    newsletterName: global.newsletterName || 'Nino Nakano'
                 },
                 externalAdReply: {
-                    title: '🦋 ' + nombreBot + ' Stickers',
-                    body: 'Sticker Maker',
-                    thumbnail: thumbBuf,
+                    title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
+                    body: esSubbot ? 'Sub-Bot de Nino Nakano' : 'Panel de Control de Aarom',
+                    thumbnail,
                     sourceUrl: canalLink,
                     mediaType: 1,
-                    renderLargerThumbnail: false,
-                    showAdAttribution: false
+                    showAdAttribution: true,
+                    renderLargerThumbnail: true
                 }
             }
         }, { quoted: m })
-    }
-
-    // Verificar ffmpeg
-    try {
-        await execAsync('ffmpeg -version')
-    } catch {
-        return sendNino('❌ *ffmpeg* no esta instalado.\n\nEn servidor: apt install ffmpeg\nEn Termux: pkg install ffmpeg')
-    }
-
-    // Detectar media
-    let mediaMsg = null
-    let mediaType = null
-    let isAnimated = false
-
-    if (m.mtype === 'imageMessage') {
-        mediaMsg  = m.msg
-        mediaType = 'imageMessage'
-    } else if (m.mtype === 'videoMessage') {
-        mediaMsg   = m.msg
-        mediaType  = 'videoMessage'
-        isAnimated = true
-    } else if (m.quoted) {
-        const qmtype = m.quoted.mtype
-        if (qmtype === 'imageMessage') {
-            mediaMsg  = m.quoted
-            mediaType = 'imageMessage'
-        } else if (qmtype === 'videoMessage') {
-            mediaMsg   = m.quoted
-            mediaType  = 'videoMessage'
-            isAnimated = true
-        } else if (qmtype === 'stickerMessage') {
-            mediaMsg   = m.quoted
-            mediaType  = 'stickerMessage'
-            isAnimated = m.quoted.isAnimated || false
-        }
-    }
-
-    if (!mediaMsg || !mediaType) {
-        return sendNino(
-            '🎨 *CREADOR DE STICKERS*\n\n' +
-            'Envia o responde una *imagen* o *video* con *#s*\n\n' +
-            '📌 Ejemplos:\n' +
-            '› Envia imagen + *#s*\n' +
-            '› Responde imagen con *#s*\n' +
-            '› Responde video/gif con *#s* (max 8 seg)\n\n' +
-            '_Stickers by ' + nombreBot + '_ 🦋'
-        )
-    }
-
-    await m.react('⏳')
-
-    try {
-        const buffer = await downloadMedia(mediaMsg, mediaType)
-
-        let webp
-        if (isAnimated || mediaType === 'videoMessage') {
-            webp = await videoToWebp(buffer)
-        } else {
-            webp = await imageToWebp(buffer)
-        }
-
-        // Pack info visible en WhatsApp
-        const packName   = (text && text.trim()) ? text.trim() : nombreBot
-        const authorName = canalLink.includes('/channel/')
-            ? '@' + canalLink.split('/channel/')[1]
-            : nombreBot
-
-        webp = await addExif(webp, packName, authorName)
-
-        // Enviar sticker (sin contextInfo, Baileys no lo soporta en stickers)
-        await conn.sendMessage(m.chat, {
-            sticker: webp
-        }, { quoted: m })
-
-        // Mensaje de confirmacion con newsletter
-        const thumbBuf = await fetch(bannerUrl || 'https://causas-files.vercel.app/fl/cyns.png')
-            .then(r => r.arrayBuffer())
-            .then(b => Buffer.from(b))
-            .catch(() => null)
-
-        await conn.sendMessage(m.chat, {
-            text: '✅ *Sticker creado por ' + nombreBot + '* 🦋',
-            contextInfo: {
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
-                    serverMessageId: '',
-                    newsletterName: global.newsletterName || nombreBot
-                },
-                externalAdReply: {
-                    title: '🦋 ' + nombreBot + ' Stickers',
-                    body: 'Sticker creado exitosamente',
-                    thumbnail: thumbBuf,
-                    sourceUrl: canalLink,
-                    mediaType: 1,
-                    renderLargerThumbnail: false,
-                    showAdAttribution: false
-                }
-            }
-        }, { quoted: m })
-
-        await m.react('✅')
 
     } catch (e) {
-        console.error('[STICKER ERROR]', e.message)
-        await m.react('❌')
-        return sendNino('❌ No pude crear el sticker.\n\nError: ' + e.message)
+        console.error('[MENU ERROR]', e)
+        // ✅ FIX: si falla el sendMessage con contextInfo, intentar envío simple
+        try {
+            await conn.sendMessage(m.chat, {
+                text: `🌸 *${global.botName || 'Nino Nakano'}*\n\nHubo un problema mostrando el menú completo.\nUsa *${usedPrefix || '#'}help* de nuevo en un momento. 🦋`
+            }, { quoted: m })
+        } catch {}
     }
 }
 
-handler.command = ['s', 'sticker']
+handler.command = ['menu', 'help', 'comandos']
 export default handler
