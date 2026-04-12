@@ -191,54 +191,89 @@ let handler = async (m, { conn, command, text }) => {
             videoUrl = query
             title = query
         } else {
-            // Probar multiples APIs de busqueda en orden
-            const searchApis = [
+            // Busqueda via YouTube interno (sin API key, siempre funciona)
+            const ytSearchApis = [
                 async () => {
-                    // GiftedTech con key Fedex
-                    const r = await apiGet(GIFTED_API + '/search/youtube?apikey=' + GIFTED_KEY + '&query=' + encodeURIComponent(query))
-                    const results = r?.result || r?.results || r?.data || []
-                    return results[0] || null
+                    // YouTube Data scraping via invidious (instancia publica)
+                    const r = await apiGet('https://inv.nadeko.net/api/v1/search?q=' + encodeURIComponent(query) + '&type=video&fields=title,videoId,author,lengthSeconds,viewCount,videoThumbnails')
+                    if (!Array.isArray(r) || !r[0]) return null
+                    const s = r[0]
+                    return {
+                        title:    s.title,
+                        videoId:  s.videoId,
+                        author:   s.author,
+                        duration: Math.floor(s.lengthSeconds / 60) + ':' + String(s.lengthSeconds % 60).padStart(2, '0'),
+                        views:    s.viewCount,
+                        thumb:    s.videoThumbnails?.[0]?.url || ''
+                    }
                 },
                 async () => {
-                    // GiftedTech con key gifted (publica)
-                    const r = await apiGet(GIFTED_API + '/search/youtube?apikey=gifted&query=' + encodeURIComponent(query))
-                    const results = r?.result || r?.results || r?.data || []
-                    return results[0] || null
+                    // Invidious instancia alternativa
+                    const r = await apiGet('https://invidious.nerdvpn.de/api/v1/search?q=' + encodeURIComponent(query) + '&type=video')
+                    if (!Array.isArray(r) || !r[0]) return null
+                    const s = r[0]
+                    return {
+                        title:    s.title,
+                        videoId:  s.videoId,
+                        author:   s.author,
+                        duration: Math.floor(s.lengthSeconds / 60) + ':' + String(s.lengthSeconds % 60).padStart(2, '0'),
+                        views:    s.viewCount,
+                        thumb:    s.videoThumbnails?.[0]?.url || ''
+                    }
                 },
                 async () => {
-                    // AlyaBot busqueda
+                    // GiftedTech ytdl - busca y descarga directo
+                    const r = await apiGet(GIFTED_API + '/download/ytdl?apikey=' + GIFTED_KEY + '&url=' + encodeURIComponent(query))
+                    if (!r?.result) return null
+                    return {
+                        title:   r.result.title || query,
+                        videoId: null,
+                        author:  r.result.channel || 'N/A',
+                        duration: r.result.duration || 'N/A',
+                        views:   0,
+                        thumb:   r.result.thumbnail || '',
+                        directUrl: r.result.url || null
+                    }
+                },
+                async () => {
+                    // AlyaBot busqueda YouTube
                     const r = await apiGet('https://rest.alyabotpe.xyz/search/youtube?q=' + encodeURIComponent(query) + '&key=' + ALYA_KEY)
                     const results = r?.data || r?.result || r?.results || []
-                    return Array.isArray(results) ? results[0] : results
-                },
-                async () => {
-                    // YouTube oEmbed como fallback para obtener info de un video
-                    // Buscar video ID via suggest API de YouTube
-                    const r = await apiGet('https://suggestqueries-clients6.youtube.com/complete/search?client=firefox&ds=yt&q=' + encodeURIComponent(query))
-                    // Usar el primer suggestion como termino de busqueda en ytdl
-                    return null
+                    const s = Array.isArray(results) ? results[0] : results
+                    if (!s) return null
+                    return {
+                        title:   s.title || s.name || query,
+                        videoId: s.id || s.videoId,
+                        author:  s.channel || s.author || 'N/A',
+                        duration: s.duration || s.length || 'N/A',
+                        views:   s.views || s.viewCount || 0,
+                        thumb:   s.thumbnail || s.image || ''
+                    }
                 }
             ]
 
-            for (const searchFn of searchApis) {
+            for (const searchFn of ytSearchApis) {
                 try {
                     const song = await searchFn()
                     if (song) {
-                        title    = song.title || song.name || query
-                        duration = song.duration || song.length || song.timestamp || 'N/A'
-                        views    = formatViews(song.views || song.viewCount || song.view_count || 0)
-                        channel  = song.channel || song.author || song.uploader || song.channelTitle || 'N/A'
-                        thumb    = song.thumbnail || song.image || song.thumbnailUrl || global.banner || ''
-                        videoUrl = song.url || song.link || song.videoUrl ||
-                            (song.id ? 'https://youtube.com/watch?v=' + song.id : '') ||
-                            (song.videoId ? 'https://youtube.com/watch?v=' + song.videoId : '')
+                        title    = song.title || query
+                        duration = song.duration || 'N/A'
+                        views    = formatViews(song.views || 0)
+                        channel  = song.author || 'N/A'
+                        thumb    = song.thumb || global.banner || ''
+                        // Si tiene URL directa (ytdl) usarla
+                        if (song.directUrl) {
+                            videoUrl = song.directUrl
+                        } else if (song.videoId) {
+                            videoUrl = 'https://youtube.com/watch?v=' + song.videoId
+                        }
                         if (videoUrl) {
-                            console.log('[PLAY] Busqueda OK')
+                            console.log('[PLAY] Busqueda OK: ' + title)
                             break
                         }
                     }
                 } catch (e) {
-                    console.log('[PLAY] API busqueda fallo: ' + e.message)
+                    console.log('[PLAY] Busqueda fallo: ' + e.message)
                 }
             }
 
@@ -246,7 +281,8 @@ let handler = async (m, { conn, command, text }) => {
                 await m.react('❌')
                 return sendPlay(conn, m,
                     '❌ No encontre resultados para *' + query + '*\n\n' +
-                    '_Intenta con el link directo de YouTube o un nombre mas especifico_'
+                    '_Intenta con el link directo de YouTube o un nombre mas especifico_\n' +
+                    '_Ejemplo: https://youtube.com/watch?v=..._'
                 )
             }
         }
