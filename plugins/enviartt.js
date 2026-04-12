@@ -3,47 +3,78 @@
  * Descarga un TikTok y lo envia al canal oficial
  * Comandos: #enviartt, #sendtt
  * Solo owners
+ *
+ * FIX: Baileys 7.x no puede enviar media directo a canales (newsletter).
+ * Solución: enviar video al chat primero, luego forwardMessage al canal.
  */
 
-const API_KEY   = 'causa-ec43262f206b3305'
 const RCANAL    = 'https://whatsapp.com/channel/0029Vb85bh7EAKWOM4Zw8N3G'
 const CANAL_JID = '120363408182996815@newsletter'
 
-const _getBannerBuffer = async () => {
-    try {
-        const src = global.banner || ''
-        if (!src) return null
-        if (src.startsWith('data:image')) {
-            return Buffer.from(src.split(',')[1], 'base64')
-        }
-        const res = await fetch(src)
-        return Buffer.from(await res.arrayBuffer())
-    } catch { return null }
-}
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const sendCtx = async (conn, m, text, isError = false) => {
-    const thumb = await _getBannerBuffer()
-    return conn.sendMessage(m.chat, {
-        text,
-        contextInfo: {
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-                newsletterJid: global.newsletterJid || CANAL_JID,
-                serverMessageId: '',
-                newsletterName: global.newsletterName || global.botName || 'Nino Nakano'
-            },
-            externalAdReply: {
-                title: (isError ? '❌ ' : '🎵 ') + (global.botName || 'Nino Nakano'),
-                body: isError ? 'Error al enviar' : 'TikTok Canal',
-                thumbnail: thumb,
-                sourceUrl: global.rcanal || RCANAL,
-                mediaType: 1,
-                renderLargerThumbnail: false,
-                showAdAttribution: false
-            }
-        }
-    }, { quoted: m })
+    const thumb = await global.getBannerThumb()
+    const ctx   = global.getNewsletterCtx(
+        thumb,
+        (isError ? '❌ ' : '🎵 ') + global.botName,
+        isError ? 'Error al enviar' : 'TikTok Canal'
+    )
+    return conn.sendMessage(m.chat, { text, contextInfo: ctx }, { quoted: m })
 }
+
+// ─── DESCARGA TIKTOK ──────────────────────────────────────────────────────────
+
+const downloadTikTok = async (url) => {
+    let videoUrl = null
+    let autor    = 'Desconocido'
+    let titulo   = ''
+
+    const apis = [
+        async () => {
+            const r = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url))
+            const j = await r.json()
+            if (j?.code !== 0) throw new Error('Tikwm error ' + j?.code)
+            autor  = j.data?.author?.unique_id || 'Desconocido'
+            titulo = j.data?.title || ''
+            // play = sin marca de agua, wmplay = con marca
+            return j.data?.play || j.data?.wmplay || null
+        },
+        async () => {
+            const r = await fetch('https://rest.alyabotpe.xyz/dl/tiktok?url=' + encodeURIComponent(url) + '&key=Duarte-zz12')
+            const j = await r.json()
+            if (!j?.status) throw new Error('AlyaBot sin status')
+            autor  = j.data?.author || j.data?.username || 'Desconocido'
+            titulo = j.data?.title  || j.data?.desc     || ''
+            return j.data?.download || j.data?.dl || j.data?.url || null
+        },
+        async () => {
+            const r = await fetch('https://api.giftedtech.co.ke/api/download/tiktok?apikey=Fedex&url=' + encodeURIComponent(url))
+            const j = await r.json()
+            const d = j?.result || j?.data
+            if (!d) throw new Error('GiftedTech sin resultado')
+            autor  = d.author   || d.username || 'Desconocido'
+            titulo = d.title    || d.desc     || ''
+            return d.video?.noWatermark || d.video?.watermark || d.download?.url || d.url || null
+        }
+    ]
+
+    for (const fn of apis) {
+        try {
+            const link = await fn()
+            if (link && String(link).startsWith('http')) {
+                videoUrl = link
+                console.log('[ENVIARTT] Descarga OK:', videoUrl.slice(0, 60))
+                break
+            }
+        } catch (e) { console.log('[ENVIARTT] API falló:', e.message) }
+    }
+
+    if (!videoUrl) throw new Error('Ninguna API pudo descargar el video de TikTok')
+    return { videoUrl, autor, titulo }
+}
+
+// ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 let handler = async (m, { conn, args }) => {
     const url = args[0] || (m.quoted?.text ? m.quoted.text.trim() : '')
@@ -51,7 +82,7 @@ let handler = async (m, { conn, args }) => {
     if (!url || !url.includes('tiktok.com')) {
         return sendCtx(conn, m,
             '🎵 *ENVIAR AL CANAL*\n\n' +
-            'Necesito un link valido de TikTok~\n\n' +
+            'Necesito un link válido de TikTok~\n\n' +
             '*Uso:*\n' +
             '› *#enviartt <link>*\n' +
             '› O responde a un mensaje con el link\n\n' +
@@ -62,105 +93,62 @@ let handler = async (m, { conn, args }) => {
     await m.react('⏳')
 
     try {
-        // Usar el JID del canal directo desde settings
-        const JID_CANAL = global.newsletterJid || CANAL_JID
-        const canalNombre = global.newsletterName || 'Canal de Nino'
+        const JID_CANAL    = global.newsletterJid || CANAL_JID
+        const canalNombre  = global.newsletterName || 'Canal de Nino'
 
-        // Descargar video de TikTok - multiples APIs con fallback
-        let videoUrl = null
-        let autor = 'Desconocido'
-        let titulo = ''
-
-        const tiktokApis = [
-            async () => {
-                // GiftedTech TikTok
-                const r = await fetch('https://api.giftedtech.co.ke/api/download/tiktok?apikey=Fedex&url=' + encodeURIComponent(url))
-                const j = await r.json()
-                const d = j?.result || j?.data
-                if (!d) throw new Error('Sin resultado')
-                autor  = d.author || d.username || d.autor || 'Desconocido'
-                titulo = d.title  || d.desc     || d.titulo || ''
-                return d.video?.noWatermark || d.video?.watermark || d.download?.url || d.url || d.videoUrl || null
-            },
-            async () => {
-                // AlyaBot TikTok
-                const r = await fetch('https://rest.alyabotpe.xyz/dl/tiktok?url=' + encodeURIComponent(url) + '&key=Duarte-zz12')
-                const j = await r.json()
-                if (!j?.status) throw new Error('Sin status')
-                autor  = j.data?.author || j.data?.username || 'Desconocido'
-                titulo = j.data?.title  || j.data?.desc || ''
-                return j.data?.download || j.data?.dl || j.data?.url || null
-            },
-            async () => {
-                // Tikwm API (publica)
-                const r = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(url))
-                const j = await r.json()
-                if (j?.code !== 0) throw new Error('Tikwm error')
-                autor  = j.data?.author?.unique_id || 'Desconocido'
-                titulo = j.data?.title || ''
-                return j.data?.play || j.data?.wmplay || null
-            }
-        ]
-
-        for (const apiFn of tiktokApis) {
-            try {
-                const link = await apiFn()
-                if (link && String(link).startsWith('http')) {
-                    videoUrl = link
-                    console.log('[ENVIARTT] API OK')
-                    break
-                }
-            } catch (e) {
-                console.log('[ENVIARTT] API fallo: ' + e.message)
-            }
-        }
-
-        if (!videoUrl) throw new Error('Ninguna API pudo descargar el video de TikTok.')
-
+        // ── 1. Descargar info del TikTok ──
+        const { videoUrl, autor, titulo } = await downloadTikTok(url)
         await m.react('⬇️')
 
-        const videoRes = await fetch(videoUrl)
-        if (!videoRes.ok) throw new Error('Error al descargar el video: HTTP ' + videoRes.status)
-        const buffer = Buffer.from(await videoRes.arrayBuffer())
-
-
         const caption =
-            '🌸 *' + titulo + '*\n\n' +
+            '🌸 *' + (titulo || 'TikTok') + '*\n\n' +
             '👤 *Creador:* @' + autor + '\n' +
             '🔗 *Fuente:* TikTok\n\n' +
             '╭─────────────────╮\n' +
-            '│  🦋 *' + (global.botName || 'Nino Nakano') + '*  │\n' +
+            '│  🦋 *' + global.botName + '*  │\n' +
             '│  ✦ Z0RT SYSTEMS ✦  │\n' +
             '╰─────────────────╯'
 
-        // NOTA: Baileys 7.x tiene bug con media en canales (video no aparece)
-        // Enviar texto al canal + video al chat del owner como workaround
+        await m.react('📤')
 
-        // 1. Enviar texto al canal (esto si funciona)
-        await conn.sendMessage(JID_CANAL, {
-            text: caption
-        })
-
-        // 2. Enviar video al chat del owner con instrucciones
-        await conn.sendMessage(m.chat, {
-            video: buffer,
-            caption:
-                '📤 *Video listo para el canal*\n\n' +
-                caption + '\n\n' +
-                '_⚠️ Nota: Baileys 7.x tiene un bug con videos en canales.\n' +
-                'El texto ya fue publicado. Puedes reenviar este video manualmente al canal._',
+        // ── 2. Enviar video al chat del owner primero ──
+        // (Baileys 7.x no puede enviar media directo a canales newsletter)
+        const sent = await conn.sendMessage(m.chat, {
+            video: { url: videoUrl },
+            caption,
             mimetype: 'video/mp4'
         }, { quoted: m })
 
+        // ── 3. Reenviar el mensaje al canal usando forwardMessage ──
+        // forwardMessage sí funciona con media en canales en Baileys 7.x
+        try {
+            await conn.forwardMessage(JID_CANAL, sent, { force: true })
+            console.log('[ENVIARTT] Video reenviado al canal OK')
+        } catch (fwdErr) {
+            // Si forwardMessage falla, intentar con copyNForward
+            console.log('[ENVIARTT] forwardMessage falló, intentando copyNForward:', fwdErr.message)
+            try {
+                await conn.copyNForward(JID_CANAL, sent, false)
+                console.log('[ENVIARTT] copyNForward al canal OK')
+            } catch (copyErr) {
+                // Último recurso: enviar directo por URL al canal
+                console.log('[ENVIARTT] copyNForward falló, enviando por URL directo:', copyErr.message)
+                await conn.sendMessage(JID_CANAL, {
+                    video: { url: videoUrl },
+                    caption,
+                    mimetype: 'video/mp4'
+                })
+            }
+        }
+
         await m.react('✅')
 
-        // Confirmar al owner
         return sendCtx(conn, m,
-            '✅ *Video enviado al canal!*\n\n' +
+            '✅ *Video publicado en el canal!*\n\n' +
             '📺 *Canal:* ' + canalNombre + '\n' +
             '👤 *Autor:* @' + autor + '\n' +
-            '📝 *Titulo:* ' + (titulo || '—') + '\n\n' +
-            '_El video ya esta en el canal_ 🦋'
+            '📝 *Título:* ' + (titulo || '—') + '\n\n' +
+            '_El video ya está en el canal_ 🦋'
         )
 
     } catch (e) {
@@ -176,5 +164,5 @@ let handler = async (m, { conn, args }) => {
 }
 
 handler.command = ['enviartt', 'sendtt']
-handler.owner = true
+handler.owner   = true
 export default handler
