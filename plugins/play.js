@@ -71,15 +71,15 @@ const formatViews = (views) => {
 // ─── BÚSQUEDA YOUTUBE ─────────────────────────────────────────────────────────
 
 const searchYoutube = async (query) => {
-    // ── 1. yt-search (siempre funciona, no necesita API key) ──
+
+    // ── 1. yt-search ──
     try {
         const { videos } = await yts(query)
         if (videos && videos.length > 0) {
             const s = videos[0]
-            console.log('[PLAY] Busqueda OK via yt-search: ' + s.title)
+            console.log('[PLAY] OK yt-search: ' + s.title)
             return {
                 title:    s.title,
-                videoId:  s.videoId,
                 videoUrl: s.url,
                 author:   s.author?.name || 'N/A',
                 duration: s.timestamp || 'N/A',
@@ -87,51 +87,96 @@ const searchYoutube = async (query) => {
                 thumb:    s.thumbnail || s.image || ''
             }
         }
-    } catch (e) {
-        console.log('[PLAY] yt-search fallo: ' + e.message)
-    }
+    } catch (e) { console.log('[PLAY] yt-search fallo: ' + e.message) }
 
-    // ── 2. AlyaBot search (fallback 1) ──
+    // ── 2. GiftedTech ytsearch ──
     try {
-        const r = await apiGet('https://rest.alyabotpe.xyz/search/youtube?q=' + encodeURIComponent(query) + '&key=' + ALYA_KEY)
-        const results = r?.data || r?.result || r?.results || []
-        const s = Array.isArray(results) ? results[0] : results
+        const r = await apiGet(GIFTED_API + '/search/ytsearch?apikey=' + GIFTED_KEY + '&q=' + encodeURIComponent(query))
+        const s = r?.result?.[0] || r?.results?.[0] || r?.data?.[0]
         if (s?.title) {
             const vid = s.id || s.videoId
-            console.log('[PLAY] Busqueda OK via AlyaBot: ' + s.title)
+            console.log('[PLAY] OK GiftedTech ytsearch: ' + s.title)
             return {
-                title:    s.title || query,
-                videoId:  vid,
-                videoUrl: vid ? 'https://youtube.com/watch?v=' + vid : '',
+                title:    s.title,
+                videoUrl: vid ? 'https://youtube.com/watch?v=' + vid : s.url || '',
                 author:   s.channel || s.author || 'N/A',
                 duration: s.duration || s.length || 'N/A',
                 views:    formatViews(s.views || s.viewCount || 0),
                 thumb:    s.thumbnail || s.image || ''
             }
         }
-    } catch (e) {
-        console.log('[PLAY] AlyaBot search fallo: ' + e.message)
-    }
+    } catch (e) { console.log('[PLAY] GiftedTech ytsearch fallo: ' + e.message) }
 
-    // ── 3. GiftedTech ytdl (fallback 2, busca y devuelve info) ──
+    // ── 3. AlyaBot search ──
     try {
-        const r = await apiGet(GIFTED_API + '/download/ytdl?apikey=' + GIFTED_KEY + '&url=' + encodeURIComponent(query))
-        if (r?.result?.title) {
-            console.log('[PLAY] Busqueda OK via GiftedTech ytdl: ' + r.result.title)
+        const r = await apiGet('https://rest.alyabotpe.xyz/search/youtube?q=' + encodeURIComponent(query) + '&key=' + ALYA_KEY)
+        const results = r?.data || r?.result || r?.results || []
+        const s = Array.isArray(results) ? results[0] : results
+        if (s?.title) {
+            const vid = s.id || s.videoId
+            console.log('[PLAY] OK AlyaBot search: ' + s.title)
             return {
-                title:      r.result.title || query,
-                videoId:    null,
-                videoUrl:   r.result.videoUrl || '',
-                author:     r.result.channel || 'N/A',
-                duration:   r.result.duration || 'N/A',
-                views:      'N/A',
-                thumb:      r.result.thumbnail || '',
-                directUrl:  r.result.url || null  // ya tiene link de descarga
+                title:    s.title,
+                videoUrl: vid ? 'https://youtube.com/watch?v=' + vid : s.url || '',
+                author:   s.channel || s.author || 'N/A',
+                duration: s.duration || s.length || 'N/A',
+                views:    formatViews(s.views || s.viewCount || 0),
+                thumb:    s.thumbnail || s.image || ''
             }
         }
-    } catch (e) {
-        console.log('[PLAY] GiftedTech ytdl fallo: ' + e.message)
-    }
+    } catch (e) { console.log('[PLAY] AlyaBot search fallo: ' + e.message) }
+
+    // ── 4. API Causas search ──
+    try {
+        const r = await apiGet('https://api-causas.duckdns.org/api/v1/buscar/youtube?q=' + encodeURIComponent(query) + '&apikey=causa-adc2c572476abdd8')
+        const s = r?.data?.[0] || r?.result?.[0] || r?.results?.[0]
+        if (s?.title) {
+            const vid = s.id || s.videoId
+            console.log('[PLAY] OK Causas search: ' + s.title)
+            return {
+                title:    s.title,
+                videoUrl: vid ? 'https://youtube.com/watch?v=' + vid : s.url || '',
+                author:   s.channel || s.author || 'N/A',
+                duration: s.duration || 'N/A',
+                views:    formatViews(s.views || 0),
+                thumb:    s.thumbnail || s.image || ''
+            }
+        }
+    } catch (e) { console.log('[PLAY] Causas search fallo: ' + e.message) }
+
+    // ── 5. GiftedTech ytdl — manda el query directo, busca y descarga ──
+    try {
+        const r = await apiGet(GIFTED_API + '/download/ytdl?apikey=' + GIFTED_KEY + '&url=' + encodeURIComponent(query), 20000)
+        if (r?.result?.title) {
+            console.log('[PLAY] OK GiftedTech ytdl: ' + r.result.title)
+            return {
+                title:     r.result.title,
+                videoUrl:  r.result.videoUrl || query,
+                author:    r.result.channel || 'N/A',
+                duration:  r.result.duration || 'N/A',
+                views:     'N/A',
+                thumb:     r.result.thumbnail || '',
+                directUrl: r.result.url || null
+            }
+        }
+    } catch (e) { console.log('[PLAY] GiftedTech ytdl fallo: ' + e.message) }
+
+    // ── 6. AlyaBot youtubeplay — última opción, manda query crudo ──
+    try {
+        const r = await apiGet('https://rest.alyabotpe.xyz/dl/youtubeplay?query=' + encodeURIComponent(query) + '&key=' + ALYA_KEY, 20000)
+        if (r?.status && r?.data) {
+            console.log('[PLAY] OK AlyaBot youtubeplay directo')
+            return {
+                title:     r.data.title || query,
+                videoUrl:  r.data.videoUrl || r.data.url || query,
+                author:    r.data.channel || 'N/A',
+                duration:  r.data.duration || 'N/A',
+                views:     'N/A',
+                thumb:     r.data.thumbnail || '',
+                directUrl: r.data.download || r.data.dl || null
+            }
+        }
+    } catch (e) { console.log('[PLAY] AlyaBot youtubeplay fallo: ' + e.message) }
 
     return null
 }
