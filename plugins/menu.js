@@ -1,5 +1,16 @@
 import { database } from '../lib/database.js'
 
+// ✅ Obtiene el contexto correcto según si es subbot o bot principal
+// Lee desde conn._subbotContext para evitar contaminación de globals
+const getCtx = (conn) => {
+    if (conn._subbotContext) return conn._subbotContext
+    return {
+        botName:  global.botName  || 'Nino Nakano',
+        banner:   global.banner   || '',
+        subbotId: null
+    }
+}
+
 const getBannerBuffer = async (bannerSrc) => {
     if (!bannerSrc) return null
     try {
@@ -15,23 +26,22 @@ const getBannerBuffer = async (bannerSrc) => {
 }
 
 let handler = async (m, { conn, usedPrefix }) => {
-    // ✅ FIX DEFINITIVO: normalizar sender igual que el handler
-    // Algunos usuarios llegan con :XX (multi-device) que no matchea en la DB
-    const rawSender = m.sender || ''
-    const sender    = rawSender.replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
-                               .split('@')[0].split(':')[0] + '@s.whatsapp.net'
+    // ✅ Leer contexto desde conn — nunca desde globals directamente
+    const ctx       = getCtx(conn)
+    const esSubbot  = !!ctx.subbotId
+    const nombreBot = ctx.botName
+    const bannerSrc = ctx.banner
 
-    // ✅ FIX: El handler.before de otros plugins puede bloquear el #menu
-    // Por eso procesamos el menú ANTES de cualquier lógica que pueda fallar
-    // y lo hacemos todo en un try/catch con fallback simple garantizado
+    // ✅ Normalizar sender
+    const sender = (m.sender || '').replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
+                                   .split('@')[0].split(':')[0] + '@s.whatsapp.net'
+
     const prefix    = usedPrefix || global.prefix || '#'
     const username  = m.pushName || 'Tesoro'
-    const nombreBot = global.botName || 'Nino Nakano'
     const canalLink = global.rcanal || ''
-    const esSubbot  = !!global._currentSubbotId
 
     // Saludo según hora
-    const hora = new Date().getHours()
+    const hora   = new Date().getHours()
     const saludo =
         hora >= 5  && hora < 12 ? 'Buenos días ☀️'  :
         hora >= 12 && hora < 18 ? 'Buenas tardes 🌸' :
@@ -46,42 +56,39 @@ let handler = async (m, { conn, usedPrefix }) => {
     const p = `${Math.abs(Date.now() - timestamp)}ms`
 
     // Uptime
-    const up = process.uptime()
+    const up     = process.uptime()
     const uptime = `${Math.floor(up/86400)}d ${Math.floor((up%86400)/3600)}h ${Math.floor((up%3600)/60)}m ${Math.floor(up%60)}s`
 
     // ✅ getUser siempre crea el usuario si no existe
     let user, users, totalreg
     try {
-        user      = database.getUser(sender)
-        users     = database.data?.users || {}
-        totalreg  = Object.keys(users).length
+        user     = database.getUser(sender)
+        users    = database.data?.users || {}
+        totalreg = Object.keys(users).length
     } catch {
-        user      = { limit: 0, exp: 0, level: 1 }
-        users     = {}
-        totalreg  = 0
+        user     = { limit: 0, exp: 0, level: 1 }
+        users    = {}
+        totalreg = 0
     }
 
-    const userMoney = user.limit   ?? 0
+    const userMoney = user.limit ?? 0
     const userExp   = user.xp ?? user.exp ?? 0
-    const userLevel = user.level   ?? 1
-    const rpg       = user.rpg     || null
+    const userLevel = user.level ?? 1
+    const rpg       = user.rpg || null
 
-    // Sub-bots activos
     const subbots      = database.data?.subbots || {}
     const totalSubbots = Object.keys(subbots).filter(k => subbots[k]?.connected).length
 
-    // Rango
     const rango =
-        userLevel < 5  ? 'Novato 🐣'     :
-        userLevel < 15 ? 'Aprendiz 🦋'   :
-        userLevel < 30 ? 'Guerrero ⚔️'   :
-        userLevel < 50 ? 'Élite 🎖️'     : 'Nino Lover 💖'
+        userLevel < 5  ? 'Novato 🐣'   :
+        userLevel < 15 ? 'Aprendiz 🦋' :
+        userLevel < 30 ? 'Guerrero ⚔️' :
+        userLevel < 50 ? 'Élite 🎖️'   : 'Nino Lover 💖'
 
-    // Ranking
     let rankText = '---'
     try {
-        const sorted   = Object.entries(users).sort((a, b) => (b[1]?.xp || b[1]?.exp || 0) - (a[1]?.xp || a[1]?.exp || 0))
-        const rankIdx  = sorted.findIndex(u => u[0] === sender) + 1
+        const sorted  = Object.entries(users).sort((a, b) => (b[1]?.xp || b[1]?.exp || 0) - (a[1]?.xp || a[1]?.exp || 0))
+        const rankIdx = sorted.findIndex(u => u[0] === sender) + 1
         if (rankIdx > 0) rankText = `${rankIdx} / ${totalreg}`
     } catch {}
 
@@ -198,11 +205,9 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
-    // ✅ Banner justo antes de enviar
-    const bannerSrc = global.banner || ''
+    // ✅ Banner del contexto correcto (subbot o principal)
     const thumbnail = await getBannerBuffer(bannerSrc)
 
-    // ✅ FIX DEFINITIVO: intentar envío completo, si falla → envío simple sin contextInfo
     try {
         await conn.sendMessage(m.chat, {
             text: txt,
@@ -225,8 +230,7 @@ _Aquí tienes todo lo que puedo hacer por ti:_
             }
         }, { quoted: m })
     } catch (e1) {
-        console.error('[MENU] Error con contextInfo, intentando sin thumbnail...', e1?.message)
-        // Segundo intento: sin thumbnail (puede ser que el buffer falle)
+        console.error('[MENU] Error con thumbnail, reintentando sin él...', e1?.message)
         try {
             await conn.sendMessage(m.chat, {
                 text: txt,
@@ -248,13 +252,8 @@ _Aquí tienes todo lo que puedo hacer por ti:_
                 }
             }, { quoted: m })
         } catch (e2) {
-            console.error('[MENU] Error sin thumbnail, enviando texto plano...', e2?.message)
-            // Tercer intento: texto plano garantizado
-            try {
-                await conn.sendMessage(m.chat, { text: txt }, { quoted: m })
-            } catch (e3) {
-                console.error('[MENU] Error crítico:', e3?.message)
-            }
+            console.error('[MENU] Enviando texto plano...', e2?.message)
+            try { await conn.sendMessage(m.chat, { text: txt }, { quoted: m }) } catch {}
         }
     }
 }
