@@ -6,51 +6,60 @@ const addExif = async (webpBuffer, packName, authorName) => {
             'sticker-pack-name': packName,
             'sticker-pack-publisher': authorName,
             'emojis': ['🦋']
-        })
+        });
 
-        const jsonBuf = Buffer.from(json, 'utf8')
+        // Usamos el buffer para medir bytes reales, ya que los emojis como '🦋' 
+        // ocupan más de 1 byte en UTF-8
+        const jsonBuf = Buffer.from(json, 'utf8');
 
-        // Header EXIF correcto para WhatsApp
+        // Header EXIF de TIFF en Little Endian
         const exifHeader = Buffer.from([
             0x49, 0x49, 0x2A, 0x00,
             0x08, 0x00, 0x00, 0x00,
             0x01, 0x00,
             0x41, 0x57,
             0x07, 0x00
-        ])
+        ]);
 
-        const countBuf = Buffer.alloc(4)
-        countBuf.writeUInt32LE(jsonBuf.length, 0)
+        const countBuf = Buffer.alloc(4);
+        countBuf.writeUInt32LE(jsonBuf.length, 0);
 
-        const offsetBuf = Buffer.alloc(4)
-        offsetBuf.writeUInt32LE(0x16, 0)
+        const offsetBuf = Buffer.alloc(4);
+        offsetBuf.writeUInt32LE(0x16, 0);
 
-        let exifData = Buffer.concat([exifHeader, countBuf, offsetBuf, jsonBuf])
+        let exifData = Buffer.concat([exifHeader, countBuf, offsetBuf, jsonBuf]);
 
-        // === FIX IMPORTANTE: padding correcto (WebP requiere longitud par) ===
-        let chunkData = exifData
-        if (chunkData.length % 2 === 1) {
-            chunkData = Buffer.concat([chunkData, Buffer.from([0x00])])
+        // Guardamos el tamaño ORIGINAL antes de aplicar cualquier padding
+        const originalExifLength = exifData.length;
+
+        // === FIX IMPORTANTE: padding correcto ===
+        let chunkData = exifData;
+        if (originalExifLength % 2 === 1) {
+            // Se agrega el byte físicamente al buffer
+            chunkData = Buffer.concat([chunkData, Buffer.from([0x00])]);
         }
 
-        const exifChunkName = Buffer.from('EXIF')
-        const exifChunkSize = Buffer.alloc(4)
-        exifChunkSize.writeUInt32LE(chunkData.length, 0)   // tamaño con padding incluido
+        const exifChunkName = Buffer.from('EXIF');
+        const exifChunkSize = Buffer.alloc(4);
+        
+        // CORRECCIÓN: Escribimos el tamaño original (sin padding) en el header del chunk
+        exifChunkSize.writeUInt32LE(originalExifLength, 0); 
 
         const added = Buffer.concat([
             exifChunkName,
             exifChunkSize,
             chunkData
-        ])
+        ]);
 
-        let result = Buffer.concat([webpBuffer, added])
+        let result = Buffer.concat([webpBuffer, added]);
 
-        // Actualizar tamaño RIFF del archivo WebP
-        result.writeUInt32LE(result.length - 8, 4)
+        // Actualizar tamaño global RIFF del archivo WebP
+        // (La longitud total del buffer menos los 8 bytes iniciales de 'RIFF' y su propio size)
+        result.writeUInt32LE(result.length - 8, 4);
 
-        return result
+        return result;
     } catch (e) {
-        console.error('[EXIF ERROR]', e.message)
-        return webpBuffer
+        console.error('[EXIF ERROR]', e.message);
+        return webpBuffer;
     }
 }
