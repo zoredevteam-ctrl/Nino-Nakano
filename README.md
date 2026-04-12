@@ -192,7 +192,7 @@ global.autoRead     = true               // Marcar mensajes como leídos
 
 <div align="center">
 
-<img src="https://causas-files.vercel.app/fl/blr8.png" alt="𝓐𝓪𝓻𝓸𝓶" width="100" style="border-radius: 50%"/>
+<img src="https://causas-files.vercel.app/fl/l7is.png" alt="𝓐𝓪𝓻𝓸𝓶" width="100" style="border-radius: 50%"/>
 
 ### 𝓐𝓪𝓻𝓸𝓶
 **Desarrollo, Arquitectura & Seguridad — Z0RT SYSTEMS**
