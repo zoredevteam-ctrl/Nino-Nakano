@@ -1,15 +1,12 @@
 /**
  * MODERACIÓN - NINO NAKANO
- * Comandos: #warn, #resetwarn, #warns, #mute, #unmute, #closegroup, #opengroup
- *           #antilink, #antispam
- * Permisos: admin o owner
+ * warn, resetwarn, warns, mute, unmute, closegroup, opengroup, antilink, antispam
  */
 
 import { database } from '../lib/database.js'
 
 const MAX_WARNS = 3
 
-// ─── HELPER: Banner Buffer ────────────────────────────────────────────────────
 const getBannerBuffer = async () => {
     try {
         const src = global.banner || ''
@@ -20,32 +17,26 @@ const getBannerBuffer = async () => {
     } catch { return null }
 }
 
-// ─── HELPER: Enviar mensaje con estilo Nino ───────────────────────────────────
-const sendNino = async (conn, m, text) => {
-    return conn.sendMessage(m.chat, {
-        text,
-        contextInfo: {
-            externalAdReply: {
-                title: `🛡️ ${global.botName || 'Nino Nakano'}`,
-                body: 'Sistema de Moderación',
-                thumbnail: await getBannerBuffer(),
-                sourceUrl: global.rcanal || '',
-                mediaType: 1,
-                renderLargerThumbnail: false
-            }
+const sendNino = async (conn, m, text) => conn.sendMessage(m.chat, {
+    text,
+    contextInfo: {
+        externalAdReply: {
+            title: `🛡️ ${global.botName || 'Nino Nakano'}`,
+            body: 'Sistema de Moderación',
+            thumbnail: await getBannerBuffer(),
+            sourceUrl: global.rcanal || '',
+            mediaType: 1,
+            renderLargerThumbnail: false
         }
-    }, { quoted: m })
-}
+    }
+}, { quoted: m })
 
-// ─── HELPER: Parsear tiempo (ej: 10m, 2h, 1d) ────────────────────────────────
 const parseTiempo = (str) => {
     if (!str) return null
     const match = str.match(/^(\d+)(s|m|h|d)$/)
     if (!match) return null
-    const val = parseInt(match[1])
-    const unit = match[2]
     const ms = { s: 1000, m: 60000, h: 3600000, d: 86400000 }
-    return val * ms[unit]
+    return parseInt(match[1]) * ms[match[2]]
 }
 
 const formatTiempo = (ms) => {
@@ -55,17 +46,29 @@ const formatTiempo = (ms) => {
     return `${Math.floor(ms / 1000)}s`
 }
 
-// ─── HELPER: Obtener JID del mencionado o citado ──────────────────────────────
+// ✅ Normalizar JID para menciones correctas
+const normalizeJidMention = (jid) => {
+    if (!jid) return ''
+    const raw = jid.split('@')[0].split(':')[0]
+    return raw + '@s.whatsapp.net'
+}
+
 const getTarget = (m) => {
-    if (m.mentionedJid?.[0]) return m.mentionedJid[0]
-    if (m.quoted?.sender) return m.quoted.sender
+    if (m.mentionedJid?.[0]) return normalizeJidMention(m.mentionedJid[0])
+    if (m.quoted?.sender)    return normalizeJidMention(m.quoted.sender)
     return null
 }
 
-// ─── TIMERS DE MUTE (en memoria) ─────────────────────────────────────────────
-const muteTimers = new Map()
+const isOwnerJid = (jid) => {
+    const num    = (jid + '').replace(/[^0-9]/g, '').split('@')[0].split(':')[0]
+    const owners = Array.isArray(global.owner) ? global.owner : []
+    return owners.some(o => {
+        const n = Array.isArray(o) ? (o[0] + '') : (o + '')
+        return n.replace(/[^0-9]/g, '') === num
+    })
+}
 
-// ─── ANTISPAM: contador de mensajes ──────────────────────────────────────────
+const muteTimers  = new Map()
 const spamTracker = new Map()
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -78,7 +81,6 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
 
     const cmd = command.toLowerCase()
 
-    // Asegurar estructura en db
     if (!db.groups) db.groups = {}
     if (!db.groups[m.chat]) db.groups[m.chat] = { muted: [], modoadmin: false }
     const grupo = db.groups[m.chat]
@@ -87,21 +89,17 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
 
     const botJid = conn.user.id.split(':')[0] + '@s.whatsapp.net'
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #warn
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #warn ─────────────────────────────────────────────────────────────────
     if (cmd === 'warn') {
         const target = getTarget(m)
         if (!target) return sendNino(conn, m,
             `⚠️ Menciona o responde a alguien para advertirlo.\n\nUso: *#warn @usuario* o responde su mensaje`
         )
-
         if (target === botJid) return sendNino(conn, m, `😤 ¿Advertirme a mí? Qué gracioso... NO.`)
         if (isOwnerJid(target) && !isOwner) return sendNino(conn, m, `👑 No puedes advertir a un owner.`)
 
         if (!grupo.warns[target]) grupo.warns[target] = 0
         grupo.warns[target]++
-
         const warns = grupo.warns[target]
         const razon = text?.replace(/@\d+/g, '').trim() || 'Sin razón especificada'
 
@@ -109,71 +107,64 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
             grupo.warns[target] = 0
             try {
                 await conn.groupParticipantsUpdate(m.chat, [target], 'remove')
-                return sendNino(conn, m,
-                    `🚫 *USUARIO EXPULSADO*\n\n` +
-                    `@${target.split('@')[0]} acumuló *${MAX_WARNS} advertencias* y fue expulsado.\n\n` +
-                    `📝 *Última razón:* ${razon}\n\n` +
-                    `_Que le vaya bien... supongo_ 💢`
-                )
+                return conn.sendMessage(m.chat, {
+                    text:
+                        `🚫 *USUARIO EXPULSADO*\n\n` +
+                        `@${target.split('@')[0]} acumuló *${MAX_WARNS} advertencias* y fue expulsado.\n\n` +
+                        `📝 *Última razón:* ${razon}\n\n_Que le vaya bien... supongo_ 💢`,
+                    contextInfo: { mentionedJid: [target] }
+                }, { quoted: m })
             } catch {
-                return sendNino(conn, m, `❌ No pude expulsar al usuario. ¿Soy admin con permisos? 🤖`)
+                return sendNino(conn, m, `❌ No pude expulsar al usuario. ¿Tengo permisos de admin? 🤖`)
             }
         }
 
-        return sendNino(conn, m,
-            `⚠️ *ADVERTENCIA ${warns}/${MAX_WARNS}*\n\n` +
-            `@${target.split('@')[0]} ha recibido una advertencia.\n\n` +
-            `📝 *Razón:* ${razon}\n\n` +
-            `${warns === MAX_WARNS - 1
-                ? `⚡ *¡Una más y será expulsado!*`
-                : `_Más advertencias y habrá consecuencias_ 🦋`}`
-        )
+        return conn.sendMessage(m.chat, {
+            text:
+                `⚠️ *ADVERTENCIA ${warns}/${MAX_WARNS}*\n\n` +
+                `@${target.split('@')[0]} ha recibido una advertencia.\n\n` +
+                `📝 *Razón:* ${razon}\n\n` +
+                `${warns === MAX_WARNS - 1 ? `⚡ *¡Una más y será expulsado!*` : `_Más advertencias y habrá consecuencias_ 🦋`}`,
+            contextInfo: { mentionedJid: [target] }
+        }, { quoted: m })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #resetwarn
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #resetwarn ────────────────────────────────────────────────────────────
     if (cmd === 'resetwarn' || cmd === 'clearwarn') {
         const target = getTarget(m)
         if (!target) return sendNino(conn, m, `Menciona o responde a alguien para resetear sus warns.`)
-
         grupo.warns[target] = 0
-        return sendNino(conn, m,
-            `✅ *ADVERTENCIAS RESETEADAS*\n\n` +
-            `Las advertencias de @${target.split('@')[0]} han sido borradas. 🌸\n\n` +
-            `_Espero que se porte bien esta vez_ 🦋`
-        )
+        return conn.sendMessage(m.chat, {
+            text:
+                `✅ *ADVERTENCIAS RESETEADAS*\n\n` +
+                `Las advertencias de @${target.split('@')[0]} han sido borradas. 🌸\n\n` +
+                `_Espero que se porte bien esta vez_ 🦋`,
+            contextInfo: { mentionedJid: [target] }
+        }, { quoted: m })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #warns
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #warns ────────────────────────────────────────────────────────────────
     if (cmd === 'warns') {
         const target = getTarget(m) || m.sender
         const warns  = grupo.warns?.[target] || 0
-        return sendNino(conn, m,
-            `📋 *ADVERTENCIAS*\n\n` +
-            `@${target.split('@')[0]} tiene *${warns}/${MAX_WARNS}* advertencias.\n\n` +
-            `${warns === 0
-                ? `_Historial limpio~ Por ahora_ 🌸`
-                : warns >= MAX_WARNS - 1
-                    ? `⚡ _¡Está al límite!_`
-                    : `_Que no llegue al límite_ 🦋`}`
-        )
+        return conn.sendMessage(m.chat, {
+            text:
+                `📋 *ADVERTENCIAS*\n\n` +
+                `@${target.split('@')[0]} tiene *${warns}/${MAX_WARNS}* advertencias.\n\n` +
+                `${warns === 0 ? `_Historial limpio~ Por ahora_ 🌸` : warns >= MAX_WARNS - 1 ? `⚡ _¡Está al límite!_` : `_Que no llegue al límite_ 🦋`}`,
+            contextInfo: { mentionedJid: [target] }
+        }, { quoted: m })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #mute
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #mute ─────────────────────────────────────────────────────────────────
     if (cmd === 'mute') {
         const target = getTarget(m)
         if (!target) return sendNino(conn, m,
             `🔇 Menciona o responde a alguien para mutearlo.\n\n` +
             `Uso: *#mute @usuario* o *#mute @usuario 10m*\n` +
-            `Tiempos: *s* (seg), *m* (min), *h* (hora), *d* (día)`
+            `Tiempos: *s* seg • *m* min • *h* hora • *d* día`
         )
-
-        if (target === botJid) return sendNino(conn, m, `😤 ¿Mutearme a mí? Inténtalo~ 🙄`)
+        if (target === botJid)                    return sendNino(conn, m, `😤 ¿Mutearme a mí? Inténtalo~ 🙄`)
         if (isOwnerJid(target) && !isOwner) return sendNino(conn, m, `👑 No puedes mutear a un owner.`)
 
         const tiempoStr = args.find(a => /^\d+(s|m|h|d)$/.test(a)) || null
@@ -182,10 +173,7 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
         if (!grupo.muted.includes(target)) grupo.muted.push(target)
 
         const muteKey = `${m.chat}:${target}`
-        if (muteTimers.has(muteKey)) {
-            clearTimeout(muteTimers.get(muteKey))
-            muteTimers.delete(muteKey)
-        }
+        if (muteTimers.has(muteKey)) { clearTimeout(muteTimers.get(muteKey)); muteTimers.delete(muteKey) }
 
         if (tiempoMs) {
             const timer = setTimeout(async () => {
@@ -201,47 +189,41 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
             muteTimers.set(muteKey, timer)
         }
 
-        return sendNino(conn, m,
-            `🔇 *USUARIO MUTEADO*\n\n` +
-            `@${target.split('@')[0]} ha sido silenciado${tiempoMs ? ` por *${formatTiempo(tiempoMs)}*` : ' indefinidamente'}.\n\n` +
-            `Sus mensajes serán eliminados automáticamente.\n` +
-            `_Usa *#unmute @usuario* para quitarlo_ 🦋`
-        )
+        return conn.sendMessage(m.chat, {
+            text:
+                `🔇 *USUARIO MUTEADO*\n\n` +
+                `@${target.split('@')[0]} ha sido silenciado${tiempoMs ? ` por *${formatTiempo(tiempoMs)}*` : ' indefinidamente'}.\n\n` +
+                `Sus mensajes serán eliminados automáticamente.\n` +
+                `_Usa *#unmute @usuario* para quitarlo_ 🦋`,
+            contextInfo: { mentionedJid: [target] }
+        }, { quoted: m })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #unmute
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #unmute ───────────────────────────────────────────────────────────────
     if (cmd === 'unmute') {
         const target = getTarget(m)
         if (!target) return sendNino(conn, m, `Menciona o responde a alguien para desmutearlo.`)
 
         grupo.muted = grupo.muted.filter(j => j !== target)
-
         const muteKey = `${m.chat}:${target}`
-        if (muteTimers.has(muteKey)) {
-            clearTimeout(muteTimers.get(muteKey))
-            muteTimers.delete(muteKey)
-        }
+        if (muteTimers.has(muteKey)) { clearTimeout(muteTimers.get(muteKey)); muteTimers.delete(muteKey) }
 
-        return sendNino(conn, m,
-            `🔊 *USUARIO DESMUTEADO*\n\n` +
-            `@${target.split('@')[0]} ya puede hablar de nuevo. 🌸\n\n` +
-            `_Espero que se porte bien esta vez_ 🦋`
-        )
+        return conn.sendMessage(m.chat, {
+            text:
+                `🔊 *USUARIO DESMUTEADO*\n\n` +
+                `@${target.split('@')[0]} ya puede hablar de nuevo. 🌸\n\n` +
+                `_Espero que se porte bien esta vez_ 🦋`,
+            contextInfo: { mentionedJid: [target] }
+        }, { quoted: m })
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #closegroup / #opengroup — SÍ necesitan bot admin
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #closegroup / #opengroup — necesitan bot admin ────────────────────────
     if (cmd === 'closegroup' || cmd === 'cerrargrupo') {
         if (!isBotAdmin) return sendNino(conn, m, `🤖 Necesito ser admin para cerrar el grupo. Dame admin primero 😒`)
         try {
             await conn.groupSettingUpdate(m.chat, 'announcement')
             return sendNino(conn, m, `🔒 *GRUPO CERRADO*\n\nSolo los admins pueden enviar mensajes ahora. 💅`)
-        } catch {
-            return sendNino(conn, m, `❌ No pude cerrar el grupo.`)
-        }
+        } catch { return sendNino(conn, m, `❌ No pude cerrar el grupo.`) }
     }
 
     if (cmd === 'opengroup' || cmd === 'abrirgrupo') {
@@ -249,33 +231,27 @@ let handler = async (m, { conn, command, text, args, isOwner, isAdmin, isBotAdmi
         try {
             await conn.groupSettingUpdate(m.chat, 'not_announcement')
             return sendNino(conn, m, `🔓 *GRUPO ABIERTO*\n\nTodos pueden enviar mensajes de nuevo. 🌸`)
-        } catch {
-            return sendNino(conn, m, `❌ No pude abrir el grupo.`)
-        }
+        } catch { return sendNino(conn, m, `❌ No pude abrir el grupo.`) }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #antilink — solo guarda config, NO necesita bot admin
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #antilink — NO necesita bot admin ────────────────────────────────────
     if (cmd === 'antilink') {
         grupo.antilink = !grupo.antilink
         return sendNino(conn, m,
             `🔗 *ANTILINK ${grupo.antilink ? 'ACTIVADO ✅' : 'DESACTIVADO ❌'}*\n\n` +
             `${grupo.antilink
-                ? `Eliminaré cualquier link o enlace que se envíe en este grupo.\nEl usuario recibirá una advertencia automática. 🦋\n\n⚠️ _Asegúrate de que sea admin para poder eliminar mensajes_`
+                ? `Eliminaré cualquier link que se envíe aquí y advertiré al usuario. A los 3 warns → kick automático. 🦋\n\n⚠️ _Necesito ser admin para eliminar mensajes_`
                 : `Ya se pueden enviar links en este grupo. 🌸`}`
         )
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // #antispam — solo guarda config, NO necesita bot admin
-    // ══════════════════════════════════════════════════════════════════════════
+    // ── #antispam — NO necesita bot admin ────────────────────────────────────
     if (cmd === 'antispam') {
         grupo.antispam = !grupo.antispam
         return sendNino(conn, m,
             `🚫 *ANTISPAM ${grupo.antispam ? 'ACTIVADO ✅' : 'DESACTIVADO ❌'}*\n\n` +
             `${grupo.antispam
-                ? `Si alguien envía 3 mensajes seguidos en menos de 5 segundos, eliminaré los mensajes y lo advertiré. 🦋\n\n⚠️ _Asegúrate de que sea admin para poder eliminar mensajes_`
+                ? `3 mensajes seguidos en menos de 5 segundos → advierto y elimino. A los 3 warns → kick. 🦋\n\n⚠️ _Necesito ser admin para eliminar mensajes_`
                 : `El antispam está desactivado en este grupo. 🌸`}`
         )
     }
@@ -291,7 +267,7 @@ handler.group = true
 handler.admin = false
 
 // ══════════════════════════════════════════════════════════════════════════════
-// HANDLER.BEFORE — procesar antilink, antispam y mute en cada mensaje
+// HANDLER.BEFORE — antilink, antispam, mute automático
 // ══════════════════════════════════════════════════════════════════════════════
 handler.before = async (m, { conn, isAdmin, isOwner }) => {
     if (!m.isGroup || !m.body) return false
@@ -300,9 +276,9 @@ handler.before = async (m, { conn, isAdmin, isOwner }) => {
     const grupo = db?.groups?.[m.chat]
     if (!grupo) return false
 
-    const sender = m.sender
+    // Normalizar sender
+    const sender = (m.sender || '').split('@')[0].split(':')[0] + '@s.whatsapp.net'
     const isAdminOrOwner = isAdmin || isOwner || isOwnerJid(sender)
-
     if (isAdminOrOwner) return false
 
     // ── Mute ──────────────────────────────────────────────────────────────────
@@ -327,7 +303,7 @@ handler.before = async (m, { conn, isAdmin, isOwner }) => {
                 try {
                     await conn.groupParticipantsUpdate(m.chat, [sender], 'remove')
                     await conn.sendMessage(m.chat, {
-                        text: `🚫 @${sender.split('@')[0]} fue expulsado por enviar links repetidamente. _Acumuló ${MAX_WARNS} advertencias_ 💢`,
+                        text: `🚫 @${sender.split('@')[0]} fue expulsado por enviar links repetidamente. _${MAX_WARNS} advertencias acumuladas_ 💢`,
                         contextInfo: { mentionedJid: [sender] }
                     })
                 } catch {}
@@ -335,7 +311,7 @@ handler.before = async (m, { conn, isAdmin, isOwner }) => {
                 await conn.sendMessage(m.chat, {
                     text:
                         `🔗 *ANTILINK* — @${sender.split('@')[0]}\n\n` +
-                        `No se permiten links aquí. ⚠️ Advertencia *${warns}/${MAX_WARNS}*\n\n` +
+                        `No se permiten links en este grupo. ⚠️ Advertencia *${warns}/${MAX_WARNS}*\n\n` +
                         `${warns === MAX_WARNS - 1 ? `⚡ *¡Una más y serás expulsado!*` : `_Próxima vez habrá consecuencias_ 🦋`}`,
                     contextInfo: { mentionedJid: [sender] }
                 })
@@ -373,7 +349,7 @@ handler.before = async (m, { conn, isAdmin, isOwner }) => {
                         try {
                             await conn.groupParticipantsUpdate(m.chat, [sender], 'remove')
                             await conn.sendMessage(m.chat, {
-                                text: `🚫 @${sender.split('@')[0]} fue expulsado por hacer spam. _Acumuló ${MAX_WARNS} advertencias_ 💢`,
+                                text: `🚫 @${sender.split('@')[0]} fue expulsado por hacer spam. _${MAX_WARNS} advertencias acumuladas_ 💢`,
                                 contextInfo: { mentionedJid: [sender] }
                             })
                         } catch {}
@@ -396,16 +372,6 @@ handler.before = async (m, { conn, isAdmin, isOwner }) => {
     }
 
     return false
-}
-
-// ─── Helper isOwnerJid ────────────────────────────────────────────────────────
-const isOwnerJid = (jid) => {
-    const num    = (jid + '').replace(/[^0-9]/g, '').split('@')[0].split(':')[0]
-    const owners = Array.isArray(global.owner) ? global.owner : []
-    return owners.some(o => {
-        const n = Array.isArray(o) ? (o[0] + '') : (o + '')
-        return n.replace(/[^0-9]/g, '') === num
-    })
 }
 
 export default handler
