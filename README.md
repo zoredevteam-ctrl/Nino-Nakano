@@ -1,7 +1,7 @@
 # 🦋 NINO NAKANO - WHATSAPP BOT 🦋
 
 <p align="center">
-  <img src="https://evogb.win/Nakano_Menu" alt="Nino Nakano" width="800">
+  <img src="https://causas-files.vercel.app/fl/9vih.gif" alt="Nino Nakano" width="800">
 </p>
 
 <p align="center">
