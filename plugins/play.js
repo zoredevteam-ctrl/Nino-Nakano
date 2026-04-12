@@ -1,9 +1,11 @@
 /**
  * PLAY - NINO NAKANO
  * #play (audio) | #playvid (video)
- * Busqueda: yt-search
+ * Busqueda: yt-search (principal) → APIs fallback
  * APIs: GiftedTech (Fedex) -> AlyaBot -> Causas
  */
+
+import yts from 'yt-search'
 
 const GIFTED_API = 'https://api.giftedtech.co.ke/api'
 const GIFTED_KEY = 'Fedex'
@@ -37,7 +39,7 @@ const sendPlay = async (conn, m, text) => {
         text,
         contextInfo: {
             isForwarded: true,
-            forwardedNewsletterMessageInfo: {
+            forwardedNewstelterMessageInfo: {
                 newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
                 serverMessageId: '',
                 newsletterName: global.newsletterName || 'Nino Nakano'
@@ -59,11 +61,79 @@ const sendPlay = async (conn, m, text) => {
 const formatViews = (views) => {
     try {
         const n = parseInt(views) || 0
-        if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B'
-        if (n >= 1000000)    return (n / 1000000).toFixed(1) + 'M'
-        if (n >= 1000)       return (n / 1000).toFixed(1) + 'k'
+        if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B'
+        if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + 'M'
+        if (n >= 1_000)         return (n / 1_000).toFixed(1) + 'k'
         return n.toLocaleString()
     } catch { return String(views || 0) }
+}
+
+// ─── BÚSQUEDA YOUTUBE ─────────────────────────────────────────────────────────
+
+const searchYoutube = async (query) => {
+    // ── 1. yt-search (siempre funciona, no necesita API key) ──
+    try {
+        const { videos } = await yts(query)
+        if (videos && videos.length > 0) {
+            const s = videos[0]
+            console.log('[PLAY] Busqueda OK via yt-search: ' + s.title)
+            return {
+                title:    s.title,
+                videoId:  s.videoId,
+                videoUrl: s.url,
+                author:   s.author?.name || 'N/A',
+                duration: s.timestamp || 'N/A',
+                views:    formatViews(s.views || 0),
+                thumb:    s.thumbnail || s.image || ''
+            }
+        }
+    } catch (e) {
+        console.log('[PLAY] yt-search fallo: ' + e.message)
+    }
+
+    // ── 2. AlyaBot search (fallback 1) ──
+    try {
+        const r = await apiGet('https://rest.alyabotpe.xyz/search/youtube?q=' + encodeURIComponent(query) + '&key=' + ALYA_KEY)
+        const results = r?.data || r?.result || r?.results || []
+        const s = Array.isArray(results) ? results[0] : results
+        if (s?.title) {
+            const vid = s.id || s.videoId
+            console.log('[PLAY] Busqueda OK via AlyaBot: ' + s.title)
+            return {
+                title:    s.title || query,
+                videoId:  vid,
+                videoUrl: vid ? 'https://youtube.com/watch?v=' + vid : '',
+                author:   s.channel || s.author || 'N/A',
+                duration: s.duration || s.length || 'N/A',
+                views:    formatViews(s.views || s.viewCount || 0),
+                thumb:    s.thumbnail || s.image || ''
+            }
+        }
+    } catch (e) {
+        console.log('[PLAY] AlyaBot search fallo: ' + e.message)
+    }
+
+    // ── 3. GiftedTech ytdl (fallback 2, busca y devuelve info) ──
+    try {
+        const r = await apiGet(GIFTED_API + '/download/ytdl?apikey=' + GIFTED_KEY + '&url=' + encodeURIComponent(query))
+        if (r?.result?.title) {
+            console.log('[PLAY] Busqueda OK via GiftedTech ytdl: ' + r.result.title)
+            return {
+                title:      r.result.title || query,
+                videoId:    null,
+                videoUrl:   r.result.videoUrl || '',
+                author:     r.result.channel || 'N/A',
+                duration:   r.result.duration || 'N/A',
+                views:      'N/A',
+                thumb:      r.result.thumbnail || '',
+                directUrl:  r.result.url || null  // ya tiene link de descarga
+            }
+        }
+    } catch (e) {
+        console.log('[PLAY] GiftedTech ytdl fallo: ' + e.message)
+    }
+
+    return null
 }
 
 // ─── DESCARGA AUDIO ───────────────────────────────────────────────────────────
@@ -85,27 +155,27 @@ const getAudio = async (url) => {
             }
         },
         {
-            nombre: 'AlyaBot Play',
-            fn: async () => {
-                const r = await apiGet('https://rest.alyabotpe.xyz/dl/youtubeplay?query=' + encodeURIComponent(url) + '&key=' + ALYA_KEY)
-                return r?.status ? (r.data?.download || r.data?.dl || r.data?.url) : null
-            }
-        },
-        {
             nombre: 'AlyaBot ytmp3',
             fn: async () => {
                 const r = await apiGet('https://rest.alyabotpe.xyz/dl/ytmp3?url=' + encodeURIComponent(url) + '&key=' + ALYA_KEY)
                 return r?.status ? (r.data?.dl || r.data?.url || r.data?.download) : null
+            }
+        },
+        {
+            nombre: 'AlyaBot Play',
+            fn: async () => {
+                const r = await apiGet('https://rest.alyabotpe.xyz/dl/youtubeplay?query=' + encodeURIComponent(url) + '&key=' + ALYA_KEY)
+                return r?.status ? (r.data?.download || r.data?.dl || r.data?.url) : null
             }
         }
     ]
 
     for (const { nombre, fn } of fuentes) {
         try {
-            console.log('[PLAY] Intentando: ' + nombre)
+            console.log('[PLAY] Intentando audio: ' + nombre)
             const link = await fn()
             if (link && String(link).startsWith('http')) {
-                console.log('[PLAY] OK: ' + nombre)
+                console.log('[PLAY] Audio OK: ' + nombre)
                 return link
             }
         } catch (e) {
@@ -151,10 +221,10 @@ const getVideo = async (url) => {
 
     for (const { nombre, fn } of fuentes) {
         try {
-            console.log('[PLAYVID] Intentando: ' + nombre)
+            console.log('[PLAYVID] Intentando video: ' + nombre)
             const link = await fn()
             if (link && String(link).startsWith('http')) {
-                console.log('[PLAYVID] OK: ' + nombre)
+                console.log('[PLAYVID] Video OK: ' + nombre)
                 return link
             }
         } catch (e) {
@@ -182,141 +252,67 @@ let handler = async (m, { conn, command, text }) => {
     await m.react('🔍')
 
     try {
-        // 1. Buscar en YouTube con multiples APIs
-        let title = query, duration = 'N/A', views = 'N/A', channel = 'N/A'
-        let thumb = global.banner || '', videoUrl = ''
+        // 1. Resolver si es link directo o búsqueda
+        let song = null
 
-        // Si es link directo de YouTube, usarlo de una vez
         if (query.includes('youtube.com/watch') || query.includes('youtu.be/')) {
-            videoUrl = query
-            title = query
+            // Link directo — construir objeto mínimo
+            song = {
+                title:    query,
+                videoUrl: query,
+                author:   'N/A',
+                duration: 'N/A',
+                views:    'N/A',
+                thumb:    global.banner || ''
+            }
         } else {
-            // Busqueda via YouTube interno (sin API key, siempre funciona)
-            const ytSearchApis = [
-                async () => {
-                    // YouTube Data scraping via invidious (instancia publica)
-                    const r = await apiGet('https://inv.nadeko.net/api/v1/search?q=' + encodeURIComponent(query) + '&type=video&fields=title,videoId,author,lengthSeconds,viewCount,videoThumbnails')
-                    if (!Array.isArray(r) || !r[0]) return null
-                    const s = r[0]
-                    return {
-                        title:    s.title,
-                        videoId:  s.videoId,
-                        author:   s.author,
-                        duration: Math.floor(s.lengthSeconds / 60) + ':' + String(s.lengthSeconds % 60).padStart(2, '0'),
-                        views:    s.viewCount,
-                        thumb:    s.videoThumbnails?.[0]?.url || ''
-                    }
-                },
-                async () => {
-                    // Invidious instancia alternativa
-                    const r = await apiGet('https://invidious.nerdvpn.de/api/v1/search?q=' + encodeURIComponent(query) + '&type=video')
-                    if (!Array.isArray(r) || !r[0]) return null
-                    const s = r[0]
-                    return {
-                        title:    s.title,
-                        videoId:  s.videoId,
-                        author:   s.author,
-                        duration: Math.floor(s.lengthSeconds / 60) + ':' + String(s.lengthSeconds % 60).padStart(2, '0'),
-                        views:    s.viewCount,
-                        thumb:    s.videoThumbnails?.[0]?.url || ''
-                    }
-                },
-                async () => {
-                    // GiftedTech ytdl - busca y descarga directo
-                    const r = await apiGet(GIFTED_API + '/download/ytdl?apikey=' + GIFTED_KEY + '&url=' + encodeURIComponent(query))
-                    if (!r?.result) return null
-                    return {
-                        title:   r.result.title || query,
-                        videoId: null,
-                        author:  r.result.channel || 'N/A',
-                        duration: r.result.duration || 'N/A',
-                        views:   0,
-                        thumb:   r.result.thumbnail || '',
-                        directUrl: r.result.url || null
-                    }
-                },
-                async () => {
-                    // AlyaBot busqueda YouTube
-                    const r = await apiGet('https://rest.alyabotpe.xyz/search/youtube?q=' + encodeURIComponent(query) + '&key=' + ALYA_KEY)
-                    const results = r?.data || r?.result || r?.results || []
-                    const s = Array.isArray(results) ? results[0] : results
-                    if (!s) return null
-                    return {
-                        title:   s.title || s.name || query,
-                        videoId: s.id || s.videoId,
-                        author:  s.channel || s.author || 'N/A',
-                        duration: s.duration || s.length || 'N/A',
-                        views:   s.views || s.viewCount || 0,
-                        thumb:   s.thumbnail || s.image || ''
-                    }
-                }
-            ]
+            song = await searchYoutube(query)
+        }
 
-            for (const searchFn of ytSearchApis) {
-                try {
-                    const song = await searchFn()
-                    if (song) {
-                        title    = song.title || query
-                        duration = song.duration || 'N/A'
-                        views    = formatViews(song.views || 0)
-                        channel  = song.author || 'N/A'
-                        thumb    = song.thumb || global.banner || ''
-                        // Si tiene URL directa (ytdl) usarla
-                        if (song.directUrl) {
-                            videoUrl = song.directUrl
-                        } else if (song.videoId) {
-                            videoUrl = 'https://youtube.com/watch?v=' + song.videoId
-                        }
-                        if (videoUrl) {
-                            console.log('[PLAY] Busqueda OK: ' + title)
-                            break
-                        }
-                    }
-                } catch (e) {
-                    console.log('[PLAY] Busqueda fallo: ' + e.message)
-                }
-            }
-
-            if (!videoUrl) {
-                await m.react('❌')
-                return sendPlay(conn, m,
-                    '❌ No encontre resultados para *' + query + '*\n\n' +
-                    '_Intenta con el link directo de YouTube o un nombre mas especifico_\n' +
-                    '_Ejemplo: https://youtube.com/watch?v=..._'
-                )
-            }
+        if (!song || !song.videoUrl) {
+            await m.react('❌')
+            return sendPlay(conn, m,
+                '❌ No encontré resultados para *' + query + '*\n\n' +
+                '_Intenta con el link directo o un nombre más específico_\n' +
+                '_Ejemplo: https://youtube.com/watch?v=..._'
+            )
         }
 
         await m.react('⬇️')
 
-        // 2. Descargar con fallback automatico
-        const finalUrl = isVideo ? await getVideo(videoUrl) : await getAudio(videoUrl)
+        // 2. Si GiftedTech ytdl ya dio URL directa, usarla; si no, descargar
+        let finalUrl = song.directUrl || null
+        if (!finalUrl) {
+            finalUrl = isVideo
+                ? await getVideo(song.videoUrl)
+                : await getAudio(song.videoUrl)
+        }
 
-        // 3. Descargar buffer con timeout
+        // 3. Descargar buffer con timeout de 60s
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), 60000)
         let buffer
         try {
             const mediaRes = await fetch(finalUrl, { signal: controller.signal })
-            if (!mediaRes.ok) throw new Error('Error descargando archivo: HTTP ' + mediaRes.status)
+            if (!mediaRes.ok) throw new Error('Error al descargar archivo: HTTP ' + mediaRes.status)
             buffer = Buffer.from(await mediaRes.arrayBuffer())
         } finally {
             clearTimeout(timer)
         }
 
         if (!buffer || buffer.length < 1000) {
-            throw new Error('El archivo descargado esta vacio o corrupto')
+            throw new Error('El archivo descargado está vacío o corrupto')
         }
 
-        // 4. Info del track
+        // 4. Texto de info
         const infoTxt =
-            '🎵 *' + title + '*\n' +
-            '👤 *Canal:* ' + channel + '\n' +
-            '⏱️ *Duracion:* ' + duration + '\n' +
-            '👁️ *Vistas:* ' + views + '\n' +
-            '🔗 ' + videoUrl
+            '🎵 *' + song.title + '*\n' +
+            '👤 *Canal:* ' + song.author + '\n' +
+            '⏱️ *Duración:* ' + song.duration + '\n' +
+            '👁️ *Vistas:* ' + song.views + '\n' +
+            '🔗 ' + song.videoUrl
 
-        // 5. Contexto con newsletter
+        // 5. Contexto newsletter
         const thumbnail = await getThumbnail()
         const ctxInfo = {
             isForwarded: true,
@@ -326,10 +322,10 @@ let handler = async (m, { conn, command, text }) => {
                 newsletterName: global.newsletterName || 'Nino Nakano'
             },
             externalAdReply: {
-                title: title.slice(0, 60),
+                title: song.title.slice(0, 60),
                 body: (global.botName || 'Nino Nakano') + ' Music',
-                thumbnailUrl: thumb,
-                sourceUrl: videoUrl,
+                thumbnailUrl: song.thumb,
+                sourceUrl: song.videoUrl,
                 thumbnail,
                 mediaType: 1,
                 renderLargerThumbnail: true,
@@ -348,7 +344,6 @@ let handler = async (m, { conn, command, text }) => {
                 contextInfo: ctxInfo
             }, { quoted: m })
         } else {
-            // Audio + info separados
             await conn.sendMessage(m.chat, {
                 audio: buffer,
                 mimetype: 'audio/mpeg',
@@ -357,7 +352,7 @@ let handler = async (m, { conn, command, text }) => {
             }, { quoted: m })
 
             await conn.sendMessage(m.chat, {
-                image: { url: thumb },
+                image: { url: song.thumb || global.banner || '' },
                 caption: infoTxt,
                 contextInfo: {
                     isForwarded: true,
@@ -367,10 +362,10 @@ let handler = async (m, { conn, command, text }) => {
                         newsletterName: global.newsletterName || 'Nino Nakano'
                     },
                     externalAdReply: {
-                        title: title.slice(0, 60),
+                        title: song.title.slice(0, 60),
                         body: (global.botName || 'Nino Nakano') + ' Music',
-                        thumbnailUrl: thumb,
-                        sourceUrl: videoUrl,
+                        thumbnailUrl: song.thumb,
+                        sourceUrl: song.videoUrl,
                         mediaType: 1,
                         renderLargerThumbnail: false,
                         showAdAttribution: false
@@ -386,7 +381,7 @@ let handler = async (m, { conn, command, text }) => {
         await m.react('❌')
         return sendPlay(conn, m,
             '❌ *Error al procesar tu solicitud*\n\n' +
-            '🔍 Busqueda: *' + query + '*\n' +
+            '🔍 Búsqueda: *' + query + '*\n' +
             '⚠️ ' + e.message + '\n\n' +
             '_Intenta de nuevo en unos segundos_'
         )
