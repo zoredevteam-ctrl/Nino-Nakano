@@ -146,27 +146,33 @@ export const handler = async (m, conn, plugins) => {
         }
 
         // ── Ejecutar handler.before de todos los plugins ──────────────────────
+        // ✅ FIX: el before NUNCA bloquea mensajes con prefijo (#menu, #play, etc.)
+        // Solo actúa en mensajes sin prefijo (respuestas de juegos, spam, links)
         if (m.isGroup) {
-            for (const [, plugin] of plugins) {
-                if (typeof plugin?.before === 'function') {
-                    try {
-                        // Calcular isAdmin/isOwner para el before
-                        const senderB = (m.sender || '').replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
-                        const isOwnerB = isOwnerJid(senderB)
-                        let isAdminB = isOwnerB
-                        if (!isAdminB) {
-                            try {
-                                const gMeta = await conn.groupMetadata(m.chat)
-                                isAdminB = gMeta.participants.some(p =>
-                                    (normalizeCore(p.id || p.jid) === normalizeCore(senderB)) &&
-                                    (p.admin || p.isAdmin || p.isSuperAdmin)
-                                )
-                            } catch {}
+            const bodyCheck = (m.body || '').trim()
+            const tienePrefix = ['#', '.', '/', '$'].some(p => bodyCheck.startsWith(p))
+
+            if (!tienePrefix) {
+                for (const [, plugin] of plugins) {
+                    if (typeof plugin?.before === 'function') {
+                        try {
+                            const senderB  = (m.sender || '').replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
+                            const isOwnerB = isOwnerJid(senderB)
+                            let isAdminB   = isOwnerB
+                            if (!isAdminB) {
+                                try {
+                                    const gMeta = await conn.groupMetadata(m.chat)
+                                    isAdminB = gMeta.participants.some(p =>
+                                        (normalizeCore(p.id || p.jid) === normalizeCore(senderB)) &&
+                                        (p.admin || p.isAdmin || p.isSuperAdmin)
+                                    )
+                                } catch {}
+                            }
+                            const stop = await plugin.before(m, { conn, isAdmin: isAdminB, isOwner: isOwnerB })
+                            if (stop === true) return
+                        } catch (e) {
+                            console.log(chalk.red('[BEFORE ERROR]'), e.message)
                         }
-                        const stop = await plugin.before(m, { conn, isAdmin: isAdminB, isOwner: isOwnerB })
-                        if (stop === true) return
-                    } catch (e) {
-                        console.log(chalk.red('[BEFORE ERROR]'), e.message)
                     }
                 }
             }
