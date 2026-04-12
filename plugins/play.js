@@ -1,8 +1,8 @@
 /**
  * PLAY - NINO NAKANO
  * #play (audio) | #playvid (video)
- * Búsqueda: yt-search → AlyaBot → GiftedTech
- * Descarga: AlyaBot ytmp3v2 / ytmp4 → GiftedTech → Causas
+ * Búsqueda: AlyaBot → GiftedTech → Causas → yt-search (último recurso)
+ * Sin dependencia de scraping para VPS/servidores con IPs bloqueadas por YouTube
  */
 
 import yts from 'yt-search'
@@ -14,7 +14,7 @@ const ALYA_KEY   = 'Duarte-zz12'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-const apiGet = async (url, timeout = 15000) => {
+const apiGet = async (url, timeout = 20000) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
     try {
@@ -32,7 +32,6 @@ const apiGet = async (url, timeout = 15000) => {
     }
 }
 
-// Usa getBannerThumb y getNewsletterCtx de settings.js directamente
 const sendPlay = async (conn, m, text) => {
     const thumbnail = await global.getBannerThumb()
     const ctx = global.getNewsletterCtx(thumbnail, '🎵 ' + global.botName + ' Music', 'Sistema de Música')
@@ -50,38 +49,41 @@ const formatViews = (views) => {
 }
 
 // ─── BÚSQUEDA YOUTUBE ─────────────────────────────────────────────────────────
+// Orden: APIs reales primero, yt-search al final como último recurso
+// Las APIs no dependen de la IP del servidor, pasan por sus propios proxies
 
 const searchYoutube = async (query) => {
 
-    // ── 1. yt-search (sin API key, método principal) ──
+    // ── 1. AlyaBot youtubeplay — busca Y devuelve descarga directa en un solo call ──
     try {
-        const { videos } = await yts(query)
-        if (videos?.length) {
-            const s = videos[0]
-            console.log('[PLAY] OK yt-search:', s.title)
+        const r = await apiGet(`${ALYA_BASE}/dl/youtubeplay?query=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
+        if (r?.status && (r.data?.title || r.result?.title)) {
+            const d = r.data || r.result
+            console.log('[PLAY] OK AlyaBot youtubeplay:', d.title)
             return {
-                title:    s.title,
-                videoUrl: s.url,
-                author:   s.author?.name || 'Desconocido',
-                duration: s.timestamp || 'N/A',
-                views:    formatViews(s.views || 0),
-                thumb:    s.thumbnail || s.image || ''
+                title:     d.title    || query,
+                videoUrl:  d.videoUrl || d.url || '',
+                author:    d.channel  || d.author || 'Desconocido',
+                duration:  d.duration || 'N/A',
+                views:     'N/A',
+                thumb:     d.thumbnail || d.image || '',
+                directUrl: d.download  || d.dl   || d.link || null
             }
         }
-    } catch (e) { console.log('[PLAY] yt-search falló:', e.message) }
+    } catch (e) { console.log('[PLAY] AlyaBot youtubeplay falló:', e.message) }
 
     // ── 2. AlyaBot search ──
     try {
         const r = await apiGet(`${ALYA_BASE}/search/youtube?q=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
-        const results = r?.data || r?.result || r?.results || []
-        const s = Array.isArray(results) ? results[0] : results
+        const list = r?.data || r?.result || r?.results || []
+        const s = Array.isArray(list) ? list[0] : list
         if (s?.title) {
             const vid = s.id || s.videoId
             console.log('[PLAY] OK AlyaBot search:', s.title)
             return {
                 title:    s.title,
                 videoUrl: vid ? `https://youtube.com/watch?v=${vid}` : s.url || '',
-                author:   s.channel || s.author || 'Desconocido',
+                author:   s.channel  || s.author || 'Desconocido',
                 duration: s.duration || s.length || 'N/A',
                 views:    formatViews(s.views || s.viewCount || 0),
                 thumb:    s.thumbnail || s.image || ''
@@ -89,24 +91,7 @@ const searchYoutube = async (query) => {
         }
     } catch (e) { console.log('[PLAY] AlyaBot search falló:', e.message) }
 
-    // ── 3. AlyaBot youtubeplay (busca y da descarga directa) ──
-    try {
-        const r = await apiGet(`${ALYA_BASE}/dl/youtubeplay?query=${encodeURIComponent(query)}&key=${ALYA_KEY}`, 20000)
-        if (r?.status && r?.data?.title) {
-            console.log('[PLAY] OK AlyaBot youtubeplay:', r.data.title)
-            return {
-                title:     r.data.title,
-                videoUrl:  r.data.videoUrl || r.data.url || query,
-                author:    r.data.channel || 'Desconocido',
-                duration:  r.data.duration || 'N/A',
-                views:     'N/A',
-                thumb:     r.data.thumbnail || '',
-                directUrl: r.data.download || r.data.dl || null
-            }
-        }
-    } catch (e) { console.log('[PLAY] AlyaBot youtubeplay falló:', e.message) }
-
-    // ── 4. GiftedTech ytsearch ──
+    // ── 3. GiftedTech ytsearch ──
     try {
         const r = await apiGet(`${GIFTED_API}/search/ytsearch?apikey=${GIFTED_KEY}&q=${encodeURIComponent(query)}`)
         const s = r?.result?.[0] || r?.results?.[0] || r?.data?.[0]
@@ -116,13 +101,65 @@ const searchYoutube = async (query) => {
             return {
                 title:    s.title,
                 videoUrl: vid ? `https://youtube.com/watch?v=${vid}` : s.url || '',
-                author:   s.channel || s.author || 'Desconocido',
+                author:   s.channel  || s.author || 'Desconocido',
                 duration: s.duration || s.length || 'N/A',
                 views:    formatViews(s.views || s.viewCount || 0),
                 thumb:    s.thumbnail || s.image || ''
             }
         }
     } catch (e) { console.log('[PLAY] GiftedTech ytsearch falló:', e.message) }
+
+    // ── 4. GiftedTech ytdl — manda query crudo, él busca internamente ──
+    try {
+        const r = await apiGet(`${GIFTED_API}/download/ytdl?apikey=${GIFTED_KEY}&url=${encodeURIComponent(query)}`)
+        if (r?.result?.title) {
+            console.log('[PLAY] OK GiftedTech ytdl:', r.result.title)
+            return {
+                title:     r.result.title,
+                videoUrl:  r.result.videoUrl || r.result.url || '',
+                author:    r.result.channel  || 'Desconocido',
+                duration:  r.result.duration || 'N/A',
+                views:     'N/A',
+                thumb:     r.result.thumbnail || '',
+                directUrl: r.result.url || null
+            }
+        }
+    } catch (e) { console.log('[PLAY] GiftedTech ytdl falló:', e.message) }
+
+    // ── 5. API Causas search ──
+    try {
+        const r = await apiGet(`https://api-causas.duckdns.org/api/v1/buscar/youtube?q=${encodeURIComponent(query)}&apikey=causa-adc2c572476abdd8`)
+        const s = r?.data?.[0] || r?.result?.[0]
+        if (s?.title) {
+            const vid = s.id || s.videoId
+            console.log('[PLAY] OK Causas search:', s.title)
+            return {
+                title:    s.title,
+                videoUrl: vid ? `https://youtube.com/watch?v=${vid}` : s.url || '',
+                author:   s.channel || s.author || 'Desconocido',
+                duration: s.duration || 'N/A',
+                views:    formatViews(s.views || 0),
+                thumb:    s.thumbnail || s.image || ''
+            }
+        }
+    } catch (e) { console.log('[PLAY] Causas search falló:', e.message) }
+
+    // ── 6. yt-search — último recurso, puede fallar en VPS con IP bloqueada ──
+    try {
+        const { videos } = await yts(query)
+        if (videos?.length) {
+            const s = videos[0]
+            console.log('[PLAY] OK yt-search (fallback final):', s.title)
+            return {
+                title:    s.title,
+                videoUrl: s.url,
+                author:   s.author?.name || 'Desconocido',
+                duration: s.timestamp   || 'N/A',
+                views:    formatViews(s.views || 0),
+                thumb:    s.thumbnail   || s.image || ''
+            }
+        }
+    } catch (e) { console.log('[PLAY] yt-search falló:', e.message) }
 
     return null
 }
@@ -132,7 +169,6 @@ const searchYoutube = async (query) => {
 const getAudio = async (url) => {
     const fuentes = [
         {
-            // Principal — igual que el bot de referencia
             nombre: 'AlyaBot ytmp3v2',
             fn: async () => {
                 const r = await apiGet(`${ALYA_BASE}/dl/ytmp3v2?url=${encodeURIComponent(url)}&key=${ALYA_KEY}`)
@@ -170,9 +206,7 @@ const getAudio = async (url) => {
                 console.log('[PLAY] Audio OK:', nombre)
                 return link
             }
-        } catch (e) {
-            console.log('[PLAY] Falló', nombre + ':', e.message)
-        }
+        } catch (e) { console.log('[PLAY] Falló', nombre + ':', e.message) }
     }
     throw new Error('Ninguna API pudo obtener el audio')
 }
@@ -182,7 +216,6 @@ const getAudio = async (url) => {
 const getVideo = async (url) => {
     const fuentes = [
         {
-            // Principal — igual que el bot de referencia
             nombre: 'AlyaBot ytmp4',
             fn: async () => {
                 const r = await apiGet(`${ALYA_BASE}/dl/ytmp4?url=${encodeURIComponent(url)}&key=${ALYA_KEY}`)
@@ -220,9 +253,7 @@ const getVideo = async (url) => {
                 console.log('[PLAYVID] Video OK:', nombre)
                 return link
             }
-        } catch (e) {
-            console.log('[PLAYVID] Falló', nombre + ':', e.message)
-        }
+        } catch (e) { console.log('[PLAYVID] Falló', nombre + ':', e.message) }
     }
     throw new Error('Ninguna API pudo obtener el video')
 }
@@ -278,9 +309,9 @@ let handler = async (m, { conn, command, text }) => {
             isVideo ? await getVideo(song.videoUrl) : await getAudio(song.videoUrl)
         )
 
-        // ── 3. Contexto newsletter usando getNewsletterCtx de settings.js ──
+        // ── 3. Contexto usando getNewsletterCtx de settings.js ──
         const thumbnail = await global.getBannerThumb()
-        const ctxInfo = global.getNewsletterCtx(
+        const ctxInfo   = global.getNewsletterCtx(
             thumbnail,
             song.title.slice(0, 60),
             global.botName + ' Music 🎵'
@@ -300,7 +331,6 @@ let handler = async (m, { conn, command, text }) => {
         await m.react('📤')
 
         if (isVideo) {
-            // Video por URL directa (evita timeout en archivos grandes)
             await conn.sendMessage(m.chat, {
                 video: { url: finalUrl },
                 caption: infoTxt,
@@ -309,7 +339,6 @@ let handler = async (m, { conn, command, text }) => {
             }, { quoted: m })
 
         } else {
-            // Audio como buffer (requerido por Baileys para audio/mpeg)
             const audioRes = await fetch(finalUrl)
             if (!audioRes.ok) throw new Error('Error al descargar audio: HTTP ' + audioRes.status)
             const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
@@ -325,7 +354,6 @@ let handler = async (m, { conn, command, text }) => {
                 contextInfo: ctxInfo
             }, { quoted: m })
 
-            // Imagen con info (igual que el bot de referencia)
             if (song.thumb) {
                 const thumbCtx = global.getNewsletterCtx(thumbnail, song.title.slice(0, 60), global.botName + ' Music 🎵')
                 thumbCtx.externalAdReply.thumbnailUrl = song.thumb
