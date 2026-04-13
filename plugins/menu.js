@@ -10,6 +10,21 @@ const getCtx = (conn) => {
     }
 }
 
+const getBannerBase64 = async (bannerSrc) => {
+    if (!bannerSrc) return null
+    try {
+        if (bannerSrc.startsWith('data:image')) {
+            return bannerSrc.split(',')[1]
+        }
+        const res = await fetch(bannerSrc)
+        if (!res.ok) return null
+        const buf = Buffer.from(await res.arrayBuffer())
+        return buf.toString('base64')
+    } catch {
+        return null
+    }
+}
+
 const getBannerBuffer = async (bannerSrc) => {
     if (!bannerSrc) return null
     try {
@@ -39,13 +54,13 @@ let handler = async (m, { conn, usedPrefix }) => {
 
     const hora   = new Date().getHours()
     const saludo =
-        hora >= 5  && hora < 12 ? 'Buenos días ☀️'  :
-        hora >= 12 && hora < 18 ? 'Buenas tardes 🌸' :
-        hora >= 18 && hora < 22 ? 'Buenas noches 🌙' : 'Te veo de nuevo 🦋'
+        hora >= 5  && hora < 12 ? 'buenos días ☀️'  :
+        hora >= 12 && hora < 18 ? 'buenas tardes 🌸' :
+        hora >= 18 && hora < 22 ? 'buenas noches 🌙' : 'hola de nuevo 🦋'
 
     const saludoBot = esSubbot
-        ? `🤖 Hola *${username}*! Soy *${nombreBot}*, tu Sub-Bot de confianza~\n${saludo}, espero disfrutes todos mis comandos 💕`
-        : `💎 Hola *${username}*! Soy *${nombreBot}* Premium Bot~\n${saludo}, espero disfrutes mis nuevos comandos 🌸`
+        ? `🤖 ¡Hola *${username}*, ${saludo}~!\nSoy *${nombreBot}*, tu Sub-Bot de confianza 💕`
+        : `💎 ¡Hola *${username}*, ${saludo}~!\nSoy *${nombreBot}* y este es mi menú~ 🌸`
 
     const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
     const p = `${Math.abs(Date.now() - timestamp)}ms`
@@ -198,29 +213,43 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
-    // ✅ SOLUCIÓN DEFINITIVA para todos los WhatsApp:
-    // Enviar banner como imagen separada + texto plano
-    // Así llega a WhatsApp normal, Business, versiones antiguas y nuevas
-    const thumbnail = await getBannerBuffer(bannerSrc)
+    // ✅ TRUCO DEL PDF FALSO — funciona en TODOS los WhatsApp
+    // El thumbnail en base64 dentro del document se renderiza universalmente
+    const bannerBase64 = await getBannerBase64(bannerSrc)
+    const bannerBuffer = bannerBase64
+        ? Buffer.from(bannerBase64, 'base64')
+        : await getBannerBuffer(bannerSrc)
 
     try {
-        // Paso 1: Enviar banner como imagen con caption corto
-        if (thumbnail) {
-            await conn.sendMessage(m.chat, {
-                image: thumbnail,
-                caption:
-                    `${esSubbot ? `🤖 *${nombreBot.toUpperCase()} SUB-BOT*` : `💎 *${nombreBot.toUpperCase()} PREMIUM*`}\n` +
-                    `> ${saludo} *${username}* 🌸`
-            }, { quoted: m })
-        }
-
-        // Paso 2: Enviar el menú completo como texto simple
-        // Sin externalAdReply — compatible con TODOS los WhatsApp
-        await conn.sendMessage(m.chat, { text: txt })
-
+        await conn.sendMessage(m.chat, {
+            document: bannerBuffer || Buffer.from(''),
+            mimetype: 'application/pdf',
+            fileName: `『 ${nombreBot} Menu 』.pdf`,
+            fileLength: 2199023255552,
+            pageCount: 1,
+            caption: txt,
+            mentions: [sender],
+            contextInfo: {
+                isForwarded: true,
+                forwardingScore: 999,
+                externalAdReply: {
+                    title: esSubbot ? `🤖 ${nombreBot}` : `💎 ${nombreBot}`,
+                    body: esSubbot ? 'Sub-Bot 🤖' : 'Bot Premium 🌸',
+                    mediaType: 1,
+                    // ✅ base64 directo — funciona en WhatsApp normal y Business
+                    thumbnail: bannerBase64 || '',
+                    renderLargerThumbnail: true,
+                    sourceUrl: canalLink
+                },
+                forwardedNewsletterMessageInfo: {
+                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
+                    newsletterName: global.newsletterName || nombreBot,
+                    serverMessageId: -1
+                }
+            }
+        }, { quoted: m })
     } catch (e) {
         console.error('[MENU ERROR]', e?.message)
-        // Fallback: solo texto plano
         try {
             await conn.sendMessage(m.chat, { text: txt }, { quoted: m })
         } catch {}
