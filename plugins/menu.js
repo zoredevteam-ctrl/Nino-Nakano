@@ -1,12 +1,11 @@
 import { database } from '../lib/database.js'
 
 // ✅ Obtiene el contexto correcto según si es subbot o bot principal
-// Lee desde conn._subbotContext para evitar contaminación de globals
 const getCtx = (conn) => {
     if (conn._subbotContext) return conn._subbotContext
     return {
-        botName:  global.botName  || 'Nino Nakano',
-        banner:   global.banner   || '',
+        botName:  global.botName || 'Nino Nakano',
+        banner:   global.banner  || '',
         subbotId: null
     }
 }
@@ -26,13 +25,11 @@ const getBannerBuffer = async (bannerSrc) => {
 }
 
 let handler = async (m, { conn, usedPrefix }) => {
-    // ✅ Leer contexto desde conn — nunca desde globals directamente
     const ctx       = getCtx(conn)
     const esSubbot  = !!ctx.subbotId
     const nombreBot = ctx.botName
     const bannerSrc = ctx.banner
 
-    // ✅ Normalizar sender
     const sender = (m.sender || '').replace(/:[0-9A-Za-z]+(?=@s\.whatsapp\.net)/, '')
                                    .split('@')[0].split(':')[0] + '@s.whatsapp.net'
 
@@ -40,7 +37,6 @@ let handler = async (m, { conn, usedPrefix }) => {
     const username  = m.pushName || 'Tesoro'
     const canalLink = global.rcanal || ''
 
-    // Saludo según hora
     const hora   = new Date().getHours()
     const saludo =
         hora >= 5  && hora < 12 ? 'Buenos días ☀️'  :
@@ -51,15 +47,12 @@ let handler = async (m, { conn, usedPrefix }) => {
         ? `🤖 Hola *${username}*! Soy *${nombreBot}*, tu Sub-Bot de confianza~\n${saludo}, espero disfrutes todos mis comandos 💕`
         : `💎 Hola *${username}*! Soy *${nombreBot}* Premium Bot~\n${saludo}, espero disfrutes mis nuevos comandos 🌸`
 
-    // Ping / Latencia
     const timestamp = m.messageTimestamp ? m.messageTimestamp * 1000 : Date.now()
     const p = `${Math.abs(Date.now() - timestamp)}ms`
 
-    // Uptime
     const up     = process.uptime()
     const uptime = `${Math.floor(up/86400)}d ${Math.floor((up%86400)/3600)}h ${Math.floor((up%3600)/60)}m ${Math.floor(up%60)}s`
 
-    // ✅ getUser siempre crea el usuario si no existe
     let user, users, totalreg
     try {
         user     = database.getUser(sender)
@@ -205,56 +198,32 @@ _Aquí tienes todo lo que puedo hacer por ti:_
 > *✧･ﾟ: ❏ ${prefix}subbots / ${prefix}delsubbot*
 > *✧･ﾟ: ❏ ${prefix}setnombre / ${prefix}setbanner*`
 
-    // ✅ Banner del contexto correcto (subbot o principal)
+    // ✅ SOLUCIÓN DEFINITIVA para todos los WhatsApp:
+    // Enviar banner como imagen separada + texto plano
+    // Así llega a WhatsApp normal, Business, versiones antiguas y nuevas
     const thumbnail = await getBannerBuffer(bannerSrc)
 
     try {
-        await conn.sendMessage(m.chat, {
-            text: txt,
-            contextInfo: {
-                isForwarded: true,
-                forwardedNewsletterMessageInfo: {
-                    newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
-                    serverMessageId: '',
-                    newsletterName: global.newsletterName || nombreBot
-                },
-                externalAdReply: {
-                    title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
-                    body: esSubbot ? `Sub-Bot de ${nombreBot}` : 'Panel de Control de Aarom',
-                    thumbnail,
-                    sourceUrl: canalLink,
-                    mediaType: 1,
-                    showAdAttribution: true,
-                    renderLargerThumbnail: true
-                }
-            }
-        }, { quoted: m })
-    } catch (e1) {
-        console.error('[MENU] Error con thumbnail, reintentando sin él...', e1?.message)
-        try {
+        // Paso 1: Enviar banner como imagen con caption corto
+        if (thumbnail) {
             await conn.sendMessage(m.chat, {
-                text: txt,
-                contextInfo: {
-                    isForwarded: true,
-                    forwardedNewsletterMessageInfo: {
-                        newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
-                        serverMessageId: '',
-                        newsletterName: global.newsletterName || nombreBot
-                    },
-                    externalAdReply: {
-                        title: esSubbot ? `🤖 ${nombreBot.toUpperCase()} SUB-BOT` : `💎 ${nombreBot.toUpperCase()} PREMIUM`,
-                        body: esSubbot ? `Sub-Bot de ${nombreBot}` : 'Panel de Control de Aarom',
-                        sourceUrl: canalLink,
-                        mediaType: 1,
-                        showAdAttribution: true,
-                        renderLargerThumbnail: true
-                    }
-                }
+                image: thumbnail,
+                caption:
+                    `${esSubbot ? `🤖 *${nombreBot.toUpperCase()} SUB-BOT*` : `💎 *${nombreBot.toUpperCase()} PREMIUM*`}\n` +
+                    `> ${saludo} *${username}* 🌸`
             }, { quoted: m })
-        } catch (e2) {
-            console.error('[MENU] Enviando texto plano...', e2?.message)
-            try { await conn.sendMessage(m.chat, { text: txt }, { quoted: m }) } catch {}
         }
+
+        // Paso 2: Enviar el menú completo como texto simple
+        // Sin externalAdReply — compatible con TODOS los WhatsApp
+        await conn.sendMessage(m.chat, { text: txt })
+
+    } catch (e) {
+        console.error('[MENU ERROR]', e?.message)
+        // Fallback: solo texto plano
+        try {
+            await conn.sendMessage(m.chat, { text: txt }, { quoted: m })
+        } catch {}
     }
 }
 
