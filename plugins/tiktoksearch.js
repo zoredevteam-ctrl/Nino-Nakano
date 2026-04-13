@@ -3,6 +3,9 @@
  * Busca videos en TikTok y descarga el primero
  * Comandos: #tiktoksearch, #tts, #buscartt
  * APIs: Tikwm search → AlyaBot → GiftedTech
+ *
+ * FIX: Tikwm a veces devuelve rutas relativas (/video/media/play/ID.mp4)
+ * en lugar de URLs completas. Se normalizan con fixUrl().
  */
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -26,24 +29,37 @@ const formatNum = (n) => {
     } catch { return String(n || 0) }
 }
 
+// Tikwm devuelve rutas relativas (/video/media/play/ID.mp4) — las convertimos a URL completa
+const fixUrl = (url) => {
+    if (!url) return null
+    const s = String(url)
+    if (s.startsWith('http')) return s
+    if (s.startsWith('/'))    return 'https://www.tikwm.com' + s
+    return null
+}
+
 // ─── BÚSQUEDA ─────────────────────────────────────────────────────────────────
 
 const searchTikTok = async (query) => {
-    // ── 1. Tikwm search (más confiable, sin API key) ──
+
+    // ── 1. Tikwm search ──
     try {
         const r = await fetch('https://www.tikwm.com/api/feed/search?keywords=' + encodeURIComponent(query) + '&count=5&cursor=0&web=1')
         const j = await r.json()
         if (j?.code !== 0 || !j?.data?.videos?.length) throw new Error('Sin resultados')
         const v = j.data.videos[0]
+        // fixUrl convierte rutas relativas a URLs absolutas
+        const videoUrl = fixUrl(v.play) || fixUrl(v.wmplay) || null
+        if (!videoUrl) throw new Error('URL de video inválida')
         console.log('[TTS] OK Tikwm search:', v.title)
         return {
             videoId:  v.id,
             titulo:   v.title || query,
             autor:    v.author?.unique_id || 'Desconocido',
-            likes:    v.digg_count  || 0,
-            plays:    v.play_count  || 0,
-            videoUrl: v.play || v.wmplay || null,
-            thumb:    v.cover || v.origin_cover || ''
+            likes:    v.digg_count || 0,
+            plays:    v.play_count || 0,
+            videoUrl,
+            thumb:    fixUrl(v.cover) || fixUrl(v.origin_cover) || ''
         }
     } catch (e) { console.log('[TTS] Tikwm search falló:', e.message) }
 
@@ -61,8 +77,8 @@ const searchTikTok = async (query) => {
             autor:    v.author || v.username || 'Desconocido',
             likes:    v.likes  || v.digg_count || 0,
             plays:    v.plays  || v.play_count || 0,
-            videoUrl: v.play   || v.download || v.url || null,
-            thumb:    v.cover  || v.thumbnail || ''
+            videoUrl: fixUrl(v.play) || fixUrl(v.download) || fixUrl(v.url) || null,
+            thumb:    fixUrl(v.cover) || fixUrl(v.thumbnail) || ''
         }
     } catch (e) { console.log('[TTS] AlyaBot search falló:', e.message) }
 
@@ -80,8 +96,8 @@ const searchTikTok = async (query) => {
             autor:    v.author || v.username || 'Desconocido',
             likes:    v.likes  || 0,
             plays:    v.plays  || 0,
-            videoUrl: v.play   || v.url || v.download || null,
-            thumb:    v.cover  || v.thumbnail || ''
+            videoUrl: fixUrl(v.play) || fixUrl(v.url) || fixUrl(v.download) || null,
+            thumb:    fixUrl(v.cover) || fixUrl(v.thumbnail) || ''
         }
     } catch (e) { console.log('[TTS] GiftedTech search falló:', e.message) }
 
@@ -120,16 +136,18 @@ let handler = async (m, { conn, text }) => {
 
         await m.react('⬇️')
 
-        // ── 2. Si la búsqueda ya trajo videoUrl, usarla; si no, descargar por ID ──
+        // ── 2. Si la búsqueda ya tiene videoUrl, usarla directamente ──
+        // Si no, intentar descargar por ID usando Tikwm
         let finalUrl = result.videoUrl
 
         if (!finalUrl && result.videoId) {
-            // Construir URL de TikTok y descargar con Tikwm
-            const ttUrl = 'https://www.tiktok.com/@' + result.autor + '/video/' + result.videoId
             try {
+                const ttUrl = 'https://www.tiktok.com/@' + result.autor + '/video/' + result.videoId
                 const r = await fetch('https://www.tikwm.com/api/?url=' + encodeURIComponent(ttUrl))
                 const j = await r.json()
-                if (j?.code === 0) finalUrl = j.data?.play || j.data?.wmplay
+                if (j?.code === 0) {
+                    finalUrl = fixUrl(j.data?.play) || fixUrl(j.data?.wmplay)
+                }
             } catch (e) { console.log('[TTS] Descarga por ID falló:', e.message) }
         }
 
@@ -140,7 +158,7 @@ let handler = async (m, { conn, text }) => {
             '🎵 *' + result.titulo + '*\n' +
             '👤 *Creador:* @' + result.autor + '\n' +
             (result.likes ? '❤️ *Likes:* ' + formatNum(result.likes) + '\n' : '') +
-            (result.plays ? '▶️ *Vistas:* ' + formatNum(result.plays) + '\n' : '') +
+            (result.plays ? '▶️ *Vistas:* '  + formatNum(result.plays) + '\n' : '') +
             '\n╭─────────────────╮\n' +
             '│  🦋 *' + global.botName + '*  │\n' +
             '╰─────────────────╯'
