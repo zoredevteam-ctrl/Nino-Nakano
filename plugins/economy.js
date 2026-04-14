@@ -19,6 +19,7 @@ const ensureUser = (db, jid) => {
     if (!db.users[jid]) db.users[jid] = {}
     const defaults = {
         exp: 0, money: 0, bank: 0, level: 1,
+        wins: 0, victories: 0,
         lastDaily: 0, lastCofre: 0, lastMinar: 0,
         lastWork: 0, lastRob: 0, lastRob2: 0, lastCrime: 0
     }
@@ -32,19 +33,15 @@ const getThumbnail = async () => {
     try {
         const url = global.banner || 'https://causas-files.vercel.app/fl/fu5r.jpg'
         const res = await fetch(url)
-        const arrayBuf = await res.arrayBuffer()
-        return Buffer.from(arrayBuf)
-    } catch {
-        return null
-    }
+        return Buffer.from(await res.arrayBuffer())
+    } catch { return null }
 }
 
 const buildContext = (thumbnail) => {
-    const newsletterJid = global.newsletterJid || '120363408182996815@newsletter'
     return {
         isForwarded: true,
         forwardedNewsletterMessageInfo: {
-            newsletterJid,
+            newsletterJid: global.newsletterJid || '120363408182996815@newsletter',
             serverMessageId: '',
             newsletterName: global.botName || 'Nino Nakano'
         },
@@ -62,30 +59,206 @@ const buildContext = (thumbnail) => {
     }
 }
 
+// ─── IMPUESTO ─────────────────────────────────────────────────────────────────
+// 10% de impuesto en donaciones entre usuarios normales
+const TAX_RATE   = 0.10
+const TAX_PCT    = Math.round(TAX_RATE * 100)
+
+const applyTax = (amount) => {
+    const tax = Math.floor(amount * TAX_RATE)
+    const net  = amount - tax
+    return { net, tax }
+}
+
 export default {
-    command: ['daily', 'cofre', 'minar', 'crime', 'crimen', 'rob', 'rob2',
-              'd', 'deposit', 'depositar', 'bal', 'baltop', 'lvl',
-              'work', 'trabajar', 'chamba', 'shop', 'tienda'],
+    command: [
+        'daily', 'cofre', 'minar', 'crime', 'crimen', 'rob', 'rob2',
+        'd', 'deposit', 'depositar', 'bal', 'baltop', 'lvl',
+        'work', 'trabajar', 'chamba', 'shop', 'tienda',
+        // ── NUEVOS ──
+        'donar', 'donate',          // usuario → usuario (con impuesto)
+        'give', 'dar',              // owner → cualquiera (sin descuento)
+        'setcoins', 'setexp',       // owner: setear valor exacto
+        'setvic', 'addvic',         // owner: victorias
+        'addexp', 'addcoins'        // owner: sumar directo
+    ],
     tags: ['economy'],
     desc: 'Sistema completo de economía Nino Nakano',
 
     async run(m, { conn, text, command, isOwner, db }) {
         const cmd = command.toLowerCase()
         const who = m.sender
-        const u = ensureUser(db, who)
+        const u   = ensureUser(db, who)
         const currency = 'Coins'
-        const t = (normal, ownerText) => isOwner ? (ownerText || normal) : normal
         const txt = text || ''
 
         const sendEco = async (msgText, mentions) => {
             const thumbnail = await getThumbnail()
-            const params = {
-                text: msgText,
-                contextInfo: buildContext(thumbnail)
-            }
+            const params = { text: msgText, contextInfo: buildContext(thumbnail) }
             if (mentions) params.mentions = mentions
             return conn.sendMessage(m.chat, params, { quoted: m })
         }
+
+        // ════════════════════════════════════════════════════════════════
+        // DONAR — usuario a usuario, con impuesto del 10%
+        // Uso: #donar <cantidad> @usuario
+        // ════════════════════════════════════════════════════════════════
+        if (cmd === 'donar' || cmd === 'donate') {
+            const target = m.quoted?.sender || m.mentionedJid?.[0]
+            const amount = parseInt(txt.replace(/@\S+/g, '').trim())
+
+            if (!target)
+                return sendEco('🎁 Menciona a alguien o responde su mensaje para donar 👀')
+            if (target === who)
+                return sendEco('😂 No puedes donarte a ti mismo bro 💀')
+            if (!amount || amount <= 0)
+                return sendEco('❌ Indica una cantidad válida\n_Ejemplo: *#donar 200 @usuario*_')
+            if ((u.money || 0) < amount)
+                return sendEco(`❌ No tienes suficiente\n💵 Tienes: *${u.money || 0} ${currency}*`)
+
+            ensureUser(db, target)
+            const victim = db.users[target]
+            const { net, tax } = applyTax(amount)
+
+            u.money      -= amount
+            victim.money  = (victim.money || 0) + net
+
+            return sendEco(
+                `🎁 *¡DONACIÓN REALIZADA!*\n\n` +
+                `👤 De: @${who.split('@')[0]}\n` +
+                `👤 Para: @${target.split('@')[0]}\n\n` +
+                `💸 Enviado: *${amount} ${currency}*\n` +
+                `🏛️ Impuesto (${TAX_PCT}%): *-${tax} ${currency}*\n` +
+                `✅ Recibido: *${net} ${currency}*\n\n` +
+                `_El gobierno siempre se lleva su parte_ 😤`,
+                [who, target]
+            )
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // GIVE — solo owner, da sin descuento, puede darse a sí mismo
+        // Uso: #give <cantidad> @usuario  |  #give exp 500 @usuario
+        // ════════════════════════════════════════════════════════════════
+        if (cmd === 'give' || cmd === 'dar') {
+            if (!isOwner)
+                return sendEco('👑 Solo el owner puede usar este comando 😤')
+
+            const target = m.quoted?.sender || m.mentionedJid?.[0] || who
+            const parts  = txt.replace(/@\S+/g, '').trim().split(/\s+/)
+
+            // Detectar si es: #give exp 500 o #give vic 10 o #give 500
+            let tipo   = 'coins'
+            let amount = 0
+
+            if (['exp', 'xp', 'experiencia'].includes(parts[0]?.toLowerCase())) {
+                tipo   = 'exp'
+                amount = parseInt(parts[1])
+            } else if (['vic', 'victorias', 'wins'].includes(parts[0]?.toLowerCase())) {
+                tipo   = 'vic'
+                amount = parseInt(parts[1])
+            } else {
+                amount = parseInt(parts[0])
+            }
+
+            if (!amount || amount <= 0)
+                return sendEco(
+                    '👑 *USO DEL GIVE:*\n\n' +
+                    '› *#give 500 @usuario* — dar coins\n' +
+                    '› *#give exp 200 @usuario* — dar exp\n' +
+                    '› *#give vic 10 @usuario* — dar victorias\n\n' +
+                    '_Sin impuesto, sin límite, sin descuento_ 👑'
+                )
+
+            ensureUser(db, target)
+            const recv = db.users[target]
+            const esTuyo = target === who
+
+            if (tipo === 'exp') {
+                recv.exp = (recv.exp || 0) + amount
+                return sendEco(
+                    `✨ *¡EXP OTORGADA!*\n\n` +
+                    `👤 Para: @${target.split('@')[0]}\n` +
+                    `✨ +*${amount} Exp*\n` +
+                    `📊 Total Exp: *${recv.exp}*\n\n` +
+                    (esTuyo ? '_Qué generoso contigo mismo~ 😏_' : '_El owner ha hablado 👑_'),
+                    [target]
+                )
+            }
+
+            if (tipo === 'vic') {
+                recv.wins      = (recv.wins      || 0) + amount
+                recv.victories = (recv.victories || 0) + amount
+                return sendEco(
+                    `🏆 *¡VICTORIAS OTORGADAS!*\n\n` +
+                    `👤 Para: @${target.split('@')[0]}\n` +
+                    `🏆 +*${amount} Victorias*\n` +
+                    `📊 Total: *${recv.victories}*\n\n` +
+                    (esTuyo ? '_Nadie te puede quitar eso~ 😏_' : '_El owner ha hablado 👑_'),
+                    [target]
+                )
+            }
+
+            // Coins por defecto
+            recv.money = (recv.money || 0) + amount
+            return sendEco(
+                `💰 *¡COINS OTORGADAS!*\n\n` +
+                `👤 Para: @${target.split('@')[0]}\n` +
+                `💰 +*${amount} ${currency}*\n` +
+                `💵 Total en mano: *${recv.money}*\n\n` +
+                (esTuyo ? '_Te diste un regalito~ 👑_' : '_Directo del owner, sin impuesto_ 🦋_'),
+                [target]
+            )
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // SETCOINS / SETEXP / SETVIC — owner: setear valor exacto
+        // ════════════════════════════════════════════════════════════════
+        if (['setcoins', 'setexp', 'setvic', 'addvic', 'addexp', 'addcoins'].includes(cmd)) {
+            if (!isOwner)
+                return sendEco('👑 Solo el owner puede usar este comando 😤')
+
+            const target = m.quoted?.sender || m.mentionedJid?.[0] || who
+            const amount = parseInt(txt.replace(/@\S+/g, '').trim())
+
+            if (isNaN(amount))
+                return sendEco(`❌ Indica un número válido\n_Ejemplo: *#${cmd} 500 @usuario*_`)
+
+            ensureUser(db, target)
+            const recv = db.users[target]
+
+            if (cmd === 'setcoins') {
+                recv.money = amount
+                return sendEco(`💰 Coins de @${target.split('@')[0]} seteadas a *${amount}* 👑`, [target])
+            }
+            if (cmd === 'addcoins') {
+                recv.money = (recv.money || 0) + amount
+                return sendEco(`💰 +${amount} Coins a @${target.split('@')[0]} → Total: *${recv.money}* 👑`, [target])
+            }
+            if (cmd === 'setexp') {
+                recv.exp = amount
+                return sendEco(`✨ Exp de @${target.split('@')[0]} seteada a *${amount}* 👑`, [target])
+            }
+            if (cmd === 'addexp') {
+                recv.exp = (recv.exp || 0) + amount
+                return sendEco(`✨ +${amount} Exp a @${target.split('@')[0]} → Total: *${recv.exp}* 👑`, [target])
+            }
+            if (cmd === 'setvic') {
+                recv.wins = amount
+                recv.victories = amount
+                return sendEco(`🏆 Victorias de @${target.split('@')[0]} seteadas a *${amount}* 👑`, [target])
+            }
+            if (cmd === 'addvic') {
+                recv.wins      = (recv.wins      || 0) + amount
+                recv.victories = (recv.victories || 0) + amount
+                return sendEco(`🏆 +${amount} victorias a @${target.split('@')[0]} → Total: *${recv.victories}* 👑`, [target])
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════
+        // COMANDOS ORIGINALES (sin cambios)
+        // ════════════════════════════════════════════════════════════════
+
+        const t = (normal, ownerText) => isOwner ? (ownerText || normal) : normal
 
         if (cmd === 'daily' || cmd === 'cofre') {
             const key = cmd === 'daily' ? 'lastDaily' : 'lastCofre'
@@ -237,83 +410,4 @@ export default {
             return sendEco(t(
                 `🏦 *¡DEPÓSITO EXITOSO!*\n\nGuardaste *${amount} ${currency}* en el banco~\n💵 En mano: ${u.money}\n🏦 En banco: ${u.bank}`,
                 `💖 Mi rey depositó *${amount} ${currency}* al banco. Qué responsable eres~ 🥰`
-            ))
-        }
-
-        if (cmd === 'bal') {
-            const target = m.quoted?.sender || m.mentionedJid?.[0] || m.sender
-            ensureUser(db, target)
-            const user = db.users[target]
-            const total = (user.money || 0) + (user.bank || 0)
-            const esTuyo = target === who
-            return sendEco(t(
-                `💰 *${esTuyo ? 'TU BALANCE' : `BALANCE DE @${target.split('@')[0]}`}*\n\n` +
-                `💵 En mano: *${user.money || 0} ${currency}*\n` +
-                `🏦 En banco: *${user.bank || 0} ${currency}*\n` +
-                `✨ Experiencia: *${user.exp || 0} XP*\n` +
-                `📊 Total: *${total} ${currency}*`,
-                `💖 *Balance de mi rey*\n\n💵 Mano: *${user.money || 0}*\n🏦 Banco: *${user.bank || 0}*\n✨ Exp: *${user.exp || 0}*\n📊 Total: *${total}*\n\n_Todo lo que tienes es mío~ 🥰_`
-            ), [target])
-        }
-
-        if (cmd === 'baltop') {
-            if (!m.isGroup) return sendEco('🏆 Este comando solo funciona en grupos!')
-            const meta = await conn.groupMetadata(m.chat)
-            const members = meta.participants.map(p => p.id)
-            const top = Object.keys(db.users || {})
-                .filter(jid => members.includes(jid))
-                .map(jid => ({ jid, total: (db.users[jid].money || 0) + (db.users[jid].bank || 0) }))
-                .sort((a, b) => b.total - a.total)
-                .slice(0, 10)
-            if (!top.length) return sendEco('😅 Nadie tiene coins en este grupo... ¡Todos son pobres!')
-            const medallas = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟']
-            let txtTop = '🏆 *TOP 10 MÁS RICOS* 💰\n\n'
-            top.forEach((p, i) => { txtTop += `${medallas[i]} @${p.jid.split('@')[0]} → *${p.total} ${currency}*\n` })
-            txtTop += `\n_¿Tú dónde quedaste?_ 👀`
-            return sendEco(txtTop, top.map(p => p.jid))
-        }
-
-        if (cmd === 'lvl') {
-            if ((u.exp || 0) < 1000) {
-                return sendEco(t(
-                    `📊 Necesitas *1000 XP* para subir de nivel.\nTienes *${u.exp || 0} XP*... te faltan *${1000 - (u.exp || 0)} XP* 📈`,
-                    `🥺 Mi amor, tienes ${u.exp || 0}/1000 XP. ¡Ya casi! 💕`
-                ))
-            }
-            u.exp -= 1000
-            u.level = (u.level || 1) + 1
-            return sendEco(t(
-                `🎉 *¡LEVEL UP!*\n\n⭐ Subiste al nivel *${u.level}*\n✨ XP restante: ${u.exp}\n\n_¡Eres cada vez más poderoso!_ 💪`,
-                `💖 *¡Mi rey subió al nivel ${u.level}!* 🎉 🥰`
-            ))
-        }
-
-        if (cmd === 'shop' || cmd === 'tienda') {
-            if (!txt) {
-                return sendEco(t(
-                    `🛒 *TIENDA DE NINO* 🛒\n\n1️⃣ ✨ *Exp Booster* (+1500 Exp) → 600 ${currency}\n2️⃣ 💰 *Money Pack* (+800 ${currency}) → 400 ${currency}\n\n_Usa *#shop buy 1* o *#shop buy 2*_\n💵 Tu saldo: *${u.money || 0} ${currency}*`,
-                    `💖 Tienda especial para mi rey~ 🥰\n\n1️⃣ Exp Booster → 600\n2️⃣ Money Pack → 400\n\n💵 Tienes: *${u.money || 0}*`
-                ))
-            }
-            const arg = txt.toLowerCase()
-            if (arg.includes('buy 1') || arg === '1') {
-                if ((u.money || 0) < 600) return sendEco(`❌ Necesitas *600* y tienes *${u.money || 0}* 💸`)
-                u.money -= 600
-                u.exp = (u.exp || 0) + 1500
-                return sendEco(t(
-                    `✨ *¡EXP BOOSTER ACTIVADO!*\n\n+1500 XP directo a tu cuenta 🚀\n💵 Coins restantes: *${u.money}*`,
-                    `💖 Mi amor compró Exp Booster~ +1500 Exp 🥰`
-                ))
-            }
-            if (arg.includes('buy 2') || arg === '2') {
-                if ((u.money || 0) < 400) return sendEco(`❌ Necesitas *400* y tienes *${u.money || 0}* 💸`)
-                u.money = (u.money || 0) + 400
-                return sendEco(t(
-                    `💰 *¡MONEY PACK ACTIVADO!*\n\n+800 ${currency} en tu bolsillo 💵\n💵 Total: *${u.money}*`,
-                    `💖 Mi rey compró Money Pack~ +800 ${currency} 🥰`
-                ))
-            }
-            return sendEco('❓ Usa *#shop* para ver los artículos disponibles 🛒')
-        }
-    }
-}
+            )
