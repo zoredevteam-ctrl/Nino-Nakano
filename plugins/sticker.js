@@ -21,13 +21,22 @@ const PACK_AUTHOR = global.ownerName || '𝓐𝓪𝓻𝓸𝓶'
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 const sendStk = async (conn, m, text, isError = false) => {
-    const thumb = await global.getBannerThumb()
-    const ctx   = global.getNewsletterCtx(
-        thumb,
-        (isError ? '❌ ' : '🦋 ') + global.botName,
-        isError ? 'Error al crear sticker' : 'Sticker Maker'
-    )
-    return conn.sendMessage(m.chat, { text, contextInfo: ctx }, { quoted: m })
+    // Fallback de seguridad por si las funciones globales no existen en tu base
+    try {
+        if (typeof global.getBannerThumb === 'function' && typeof global.getNewsletterCtx === 'function') {
+            const thumb = await global.getBannerThumb()
+            const ctx   = global.getNewsletterCtx(
+                thumb,
+                (isError ? '❌ ' : '🦋 ') + (global.botName || 'Bot'),
+                isError ? 'Error al crear sticker' : 'Sticker Maker'
+            )
+            return await conn.sendMessage(m.chat, { text, contextInfo: ctx }, { quoted: m })
+        }
+    } catch (e) {
+        console.warn('[WARN] Funciones globales de contexto no encontradas. Usando mensaje simple.');
+    }
+    
+    return await conn.sendMessage(m.chat, { text }, { quoted: m })
 }
 
 const tmpFile = (ext) => join(tmpdir(), `nino_stk_${Date.now()}.${ext}`)
@@ -90,8 +99,9 @@ const imageToWebp = async (buffer) => {
     const output = tmpFile('webp')
     try {
         await writeFile(input, buffer)
+        // Se agregó -vcodec libwebp y se corrigió el color alpha (color=0x00000000)
         await execAsync(
-            `ffmpeg -y -i "${input}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=white@0" -quality 80 "${output}"`
+            `ffmpeg -y -i "${input}" -vcodec libwebp -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000" -q:v 80 "${output}"`
         )
         return await readFile(output)
     } finally {
@@ -106,24 +116,9 @@ const videoToWebp = async (buffer, ext = 'mp4') => {
     const output = tmpFile('webp')
     try {
         await writeFile(input, buffer)
+        // Se corrigió el color alpha para evitar fallos en ciertas versiones de ffmpeg
         await execAsync(
-            `ffmpeg -y -i "${input}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=white@0,fps=15" -vcodec libwebp -lossless 0 -compression_level 6 -quality 50 -loop 0 -preset picture -an -vsync 0 -t 8 "${output}"`
-        )
-        return await readFile(output)
-    } finally {
-        await unlink(input).catch(() => {})
-        await unlink(output).catch(() => {})
-    }
-}
-
-// WebP estático → WebP (resize)
-const webpToWebp = async (buffer) => {
-    const input  = tmpFile('webp')
-    const output = tmpFile('webp')
-    try {
-        await writeFile(input, buffer)
-        await execAsync(
-            `ffmpeg -y -i "${input}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2" -quality 80 "${output}"`
+            `ffmpeg -y -i "${input}" -vf "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000,fps=15" -vcodec libwebp -lossless 0 -compression_level 6 -q:v 50 -loop 0 -preset picture -an -vsync 0 -t 8 "${output}"`
         )
         return await readFile(output)
     } finally {
@@ -134,14 +129,11 @@ const webpToWebp = async (buffer) => {
 
 // ─── HANDLER ──────────────────────────────────────────────────────────────────
 
-let handler = async (m, { conn, command, text }) => {
+let handler = async (m, { conn, command, text, usedPrefix }) => {
     const cmd    = command.toLowerCase()
-    const quoted = m.quoted || m
+    const quoted = m.quoted ? m.quoted : m
+    const prefix = usedPrefix || global.prefix || '#'
 
-    // ── #take — robar sticker con pack name personalizado ──
-    const isTake = cmd === 'take'
-
-    // Determinar pack y autor
     let packName   = PACK_NAME
     let authorName = PACK_AUTHOR
 
@@ -151,21 +143,13 @@ let handler = async (m, { conn, command, text }) => {
         if (parts[1]) authorName = parts[1]
     }
 
-    // Obtener el mensaje con media
-    const msg = quoted?.message || m.message
-    if (!msg) {
-        return sendStk(conn, m,
-            '🦋 *STICKER MAKER*\n\n' +
-            'Responde a una imagen, video, GIF o sticker~\n\n' +
-            '*Uso:*\n' +
-            '› *' + global.prefix + 's* — sticker normal\n' +
-            '› *' + global.prefix + 's NombrePack | Autor* — con nombre\n' +
-            '› *' + global.prefix + 'take* — robar sticker\n\n' +
-            '_Ejemplo: ' + global.prefix + 's Nino | 𝓐𝓪𝓻𝓸𝓶_'
-        )
-    }
+    // Extraer mensaje, dando soporte a "Ver una vez" (ViewOnce)
+    let msg = quoted?.message || m.message
+    if (!msg) return
+    
+    if (msg.viewOnceMessageV2) msg = msg.viewOnceMessageV2.message
+    else if (msg.viewOnceMessage) msg = msg.viewOnceMessage.message
 
-    // Detectar tipo de media
     const imageMsg      = msg.imageMessage
     const videoMsg      = msg.videoMessage
     const stickerMsg    = msg.stickerMessage
@@ -176,8 +160,13 @@ let handler = async (m, { conn, command, text }) => {
 
     if (!hasMedia) {
         return sendStk(conn, m,
-            '🦋 Responde a una *imagen*, *video*, *GIF* o *sticker* para crear el sticker~\n\n' +
-            '_Ejemplo: responde a una foto con *' + global.prefix + 's*_'
+            '🦋 *STICKER MAKER*\n\n' +
+            'Responde a una imagen, video, GIF o sticker~\n\n' +
+            '*Uso:*\n' +
+            '› *' + prefix + 's* — sticker normal\n' +
+            '› *' + prefix + 's NombrePack | Autor* — con nombre\n' +
+            '› *' + prefix + 'take* — robar sticker\n\n' +
+            '_Ejemplo: ' + prefix + 's Nino | 𝓐𝓪𝓻𝓸𝓶_'
         )
     }
 
@@ -186,24 +175,21 @@ let handler = async (m, { conn, command, text }) => {
     try {
         let webpBuffer
 
+        // Soporte universal para descargas en distintas bases de Baileys
+        const buffer = typeof quoted.download === 'function' 
+            ? await quoted.download() 
+            : await conn.downloadMediaMessage(quoted)
+
+        if (!buffer) throw new Error('No se pudo descargar el archivo')
+
         if (stickerMsg) {
-            // ── Sticker → Sticker (robar / cambiar pack) ──
-            const buffer = await conn.downloadMediaMessage(quoted)
-            webpBuffer = await webpToWebp(buffer)
-
-        } else if (gifMsg) {
-            // ── GIF → WebP animado ──
-            const buffer = await conn.downloadMediaMessage(quoted)
+            // ── Sticker → No usar ffmpeg para NO PERDER la animación ──
+            webpBuffer = buffer
+        } else if (gifMsg || videoMsg) {
+            // ── GIF/Video → WebP animado ──
             webpBuffer = await videoToWebp(buffer, 'mp4')
-
-        } else if (videoMsg) {
-            // ── Video → WebP animado (máx 8s) ──
-            const buffer = await conn.downloadMediaMessage(quoted)
-            webpBuffer = await videoToWebp(buffer, 'mp4')
-
         } else {
             // ── Imagen → WebP estático ──
-            const buffer = await conn.downloadMediaMessage(quoted)
             webpBuffer = await imageToWebp(buffer)
         }
 
@@ -211,7 +197,6 @@ let handler = async (m, { conn, command, text }) => {
             throw new Error('El WebP generado está vacío o corrupto')
         }
 
-        // Agregar metadata EXIF (pack visible en WhatsApp)
         const finalWebp = await addExif(webpBuffer, packName, authorName)
 
         await conn.sendMessage(m.chat, {
@@ -221,12 +206,11 @@ let handler = async (m, { conn, command, text }) => {
         await m.react('✅')
 
     } catch (e) {
-        console.error('[STICKER ERROR]', e.message)
+        console.error('[STICKER ERROR]', e)
         await m.react('❌')
 
-        // Mensaje de error específico según el problema
         let errMsg = '❌ *Error al crear el sticker*\n\n'
-        if (e.message.includes('ffmpeg')) {
+        if (e.message.includes('ffmpeg') || e.message.includes('spawn')) {
             errMsg += '⚠️ FFmpeg no está instalado o no se encontró\n_Instala con: `pkg install ffmpeg`_'
         } else if (e.message.includes('vacío') || e.message.includes('corrupto')) {
             errMsg += '⚠️ El archivo de entrada está dañado o no es compatible'
