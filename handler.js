@@ -480,7 +480,7 @@ export const handler = async (m, conn, plugins) => {
             }
 
             const debug = isOwner
-                ? `💢 *¡Mi amor, algo se rompió!* 💢\nNo te preocupes, yo te arreglo todo 🥺\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* ${name}\n\n🧾 *Detalle:*\n ${message.slice(0, 280)}`
+                ? `💢 *¡Mi creador, algo se rompió!* 💢\nNo te preocupes, yo te notifico todo 🎀\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* ${name}\n\n🧾 *Detalle:*\n ${message.slice(0, 280)}`
                 : `💢 *¡UGH! ROMPISTE ALGO, TONTO* 💢\n\nAlgo salió mal en el código…\n\n📌 *Comando:* ${prefix + commandName}\n📂 *Archivo:* ${file} (Línea: ${line})\n📛 *Error:* ${name}\n\n🧾 *Detalle:*\n ${message.slice(0, 280)}`;
 
             if (m?.reply) await m.reply(debug);
