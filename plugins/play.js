@@ -1,151 +1,59 @@
-/**
- * PLAY - NINO NAKANO
- * #play (audio) | #playvid (video)
- * Z0RT SYSTEMS 🦋
- */
+// Código creado por Zoredevteam-ctrl
 
-const ALYA_BASE  = 'https://nex-magical.vercel.app'
-const ALYA_KEY   = 'Duarte-zz12'
+import ytsearch from 'yt-search'
+import { getBuffer } from '../../core/message.ts'
+import fetch from 'node-fetch'
 
-const apiGet = async (url, timeout = 25000) => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), timeout)
+export default {
+  command: ['play', 'mp3', 'ytmp3', 'ytaudio', 'playaudio'],
+  category: 'downloader',
+  run: async (sock, m, args) => {
     try {
-        const res = await fetch(url, {
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'application/json'
-            }
-        })
-        if (!res.ok) throw new Error('HTTP ' + res.status)
-        return res.json()
-    } finally {
-        clearTimeout(timer)
-    }
-}
+      if (!args[0]) {
+        return m.reply('《✧》 ¡Hola! Por favor, dime el nombre o envíame el enlace del video que deseas escuchar 💕')
+      }
 
-const formatViews = (views) => {
-    try {
-        const n = parseInt(views) || 0
-        if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B'
-        if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + 'M'
-        if (n >= 1_000)         return (n / 1_000).toFixed(1) + 'k'
-        return n.toLocaleString()
-    } catch { return String(views || 0) }
-}
+      const text = args.join(' ')
+      const searchResult = await ytsearch(text)
+      if (!searchResult.videos || !searchResult.videos.length) {
+        return m.reply('《✧》 Lo siento mucho, no pude encontrar ese video. ¿Podrías intentar con otro? 🥺')
+      }
 
-const searchYoutube = async (query) => {
-    try {
-        const r = await apiGet(`${ALYA_BASE}/search/youtube?q=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
-        const list = r?.data || r?.result || []
-        const s = Array.isArray(list) ? list[0] : list
-        if (s?.title) {
-            return {
-                title:    s.title,
-                url:      s.id ? `https://youtube.com/watch?v=${s.id}` : s.url || '',
-                author:   s.channel || s.author || 'Desconocido',
-                duration: s.duration || s.length || 'N/A',
-                views:    formatViews(s.views || 0),
-                thumb:    s.thumbnail || s.image || ''
-            }
-        }
-    } catch (e) { console.log(e.message) }
-    return null
-}
+      const video = searchResult.videos[0]
 
-const handler = async (m, { conn, command, text }) => {
-    const cmd     = command.toLowerCase()
-    const isVideo = ["playvid", "ytmp4", "play2", "playv"].includes(cmd)
-    const query   = (text || '').trim()
+      const { title, author, timestamp: duration, views, url, image } = video
+      const vistas = (views || 0).toLocaleString()
+      const canal = author?.name || author || 'Desconocido'
+      const thumbBuffer = await getBuffer(image)
 
-    if (!query) return m.reply(
-        `${isVideo ? '🎬' : '🎵'} *${isVideo ? 'PLAY VIDEO' : 'PLAY MÚSICA'}*\n\n` +
-        `Uso: *${global.prefix + cmd} <nombre o link>*\n` +
-        `Ejemplo: *${global.prefix + cmd} bad bunny titi me pregunto*`
-    )
+      const caption = `➥ Descargando tu canción › ${title}
 
-    await m.react('🔍')
+> ✿⃘࣪◌ ֪ Canal › ${canal}
+> ✿⃘࣪◌ ֪ Duración › ${duration || 'Desconocido'}
+> ✿⃘࣪◌ ֪ Vistas › ${vistas}
+> ✿⃘࣪◌ ֪ Enlace › ${url}
 
-    try {
-        let song = null
-        const isYtLink = query.startsWith('https://')
+𐙚 ❀ ｡ ↻ Dame un momentito, Nino ya te está enviando el audio... ˙𐙚`
 
-        if (isYtLink) {
-            song = { title: 'YouTube Media', url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
-        } else {
-            song = await searchYoutube(query)
-        }
+      await sock.sendMessage(m.chat, { image: thumbBuffer, caption }, { quoted: m })
 
-        if (!song?.url) {
-            await m.react('❌')
-            return m.reply(`❌ No encontré resultados para *${query}*`)
-        }
+      const dlEndpoint = `${global.api.url}/dl/ytmp3v2?url=${encodeURIComponent(url)}&key=${global.api.key}`
+      const resDl = await fetch(dlEndpoint).then(r => r.json())
+      
+      if (!resDl?.status || !resDl.data?.dl) {
+        return m.reply('《✧》 Ay, hubo un problemita y no pude descargar el *audio*. ¿Lo intentamos de nuevo más tarde? 🌸')
+      }
 
-        await m.react(isVideo ? '🎬' : '🎵')
+      const audioBuffer = await getBuffer(resDl.data.dl)
+      const mensaje = {
+        audio: audioBuffer,
+        mimetype: 'audio/mpeg',
+        fileName: `${resDl.data.title || title}.mp3`
+      }
 
-        const apiUrl = isVideo 
-            ? `https://api-gohan.onrender.com/download/ytvideo?url=${encodeURIComponent(song.url)}`
-            : `https://api-gohan.onrender.com/download/ytaudio?url=${encodeURIComponent(song.url)}`
-
-        const response = await fetch(apiUrl)
-        const data = await response.json()
-        const finalUrl = data?.result?.download_url
-
-        if (!finalUrl) throw new Error('Error en la API de descarga.')
-
-        const caption =
-            `🎵 *${song.title}*\n` +
-            `👤 *Canal:* ${song.author}\n` +
-            `⏱️ *Duración:* ${song.duration}\n` +
-            `👁️ *Vistas:* ${song.views}\n` +
-            `🔗 ${song.url}`
-
-        const thumb = await global.getBannerThumb()
-        const ctx   = global.getNewsletterCtx(thumb, song.title.slice(0, 60), global.botName + ' Music 🎵')
-        ctx.externalAdReply.thumbnailUrl          = song.thumb || global.banner
-        ctx.externalAdReply.sourceUrl             = song.url
-        ctx.externalAdReply.renderLargerThumbnail = isVideo
-
-        await m.react('📤')
-
-        if (isVideo) {
-            await conn.sendMessage(m.chat, {
-                video: { url: finalUrl },
-                caption,
-                mimetype: 'video/mp4',
-                contextInfo: ctx
-            }, { quoted: m })
-        } else {
-            await conn.sendMessage(m.chat, {
-                audio: { url: finalUrl },
-                mimetype: 'audio/mpeg',
-                ptt: false,
-                contextInfo: ctx
-            }, { quoted: m })
-
-            if (song.thumb) {
-                const thumbCtx = global.getNewsletterCtx(thumb, song.title.slice(0, 60), global.botName + ' Music 🎵')
-                thumbCtx.externalAdReply.thumbnailUrl = song.thumb
-                thumbCtx.externalAdReply.sourceUrl    = song.url
-                await conn.sendMessage(m.chat, {
-                    image: { url: song.thumb },
-                    caption,
-                    contextInfo: thumbCtx
-                }, { quoted: m })
-            }
-        }
-
-        await m.react('✅')
-
+      await sock.sendMessage(m.chat, mensaje, { quoted: m })
     } catch (e) {
-        await m.react('❌')
-        m.reply(`❌ *Error*\n\n⚠️ ${e.message}`)
+      await m.reply(global.msgglobal || '《✧》 Ocurrió un error inesperado, por favor avísale a mi creador. 😥')
     }
+  }
 }
-
-handler.help    = ['play', 'playvid']
-handler.tags    = ['descargas']
-handler.command = ['play', 'playvid', 'playv', 'musica', 'ytmp3', 'ytmp4', 'play2']
-
-export default handler
