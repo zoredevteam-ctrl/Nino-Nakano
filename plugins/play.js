@@ -2,9 +2,7 @@
  * PLAY - NINO NAKANO 🦋
  * Descarga audio de YouTube
  * API Principal: NexEvo (nex-magical.vercel.app)
- * Fallback búsqueda: AlyaBot → GiftedTech
- * Fallback descarga: AlyaBot → GiftedTech
- * Comandos: #play, #mp3, #ytmp3, #musica
+ * Fallback: AlyaBot → GiftedTech
  * Z0RT SYSTEMS
  */
 
@@ -17,16 +15,42 @@ const GIFTED_KEY = 'Fedex'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-const apiGet = async (url, timeout = 20000, extraHeaders = {}) => {
+// NexEvo devuelve JSON con valores en español (verdadero/falso/nulo)
+// que NO son JSON válido — hay que parsear manualmente
+const nexFetch = async (url, timeout = 20000) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
     try {
         const res = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36',
                 'Accept': 'application/json',
-                ...extraHeaders
+                'x-api-key': NEX_KEY
+            }
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const raw = await res.text()
+        // Reemplazar valores en español por valores JSON válidos
+        const fixed = raw
+            .replace(/\bverdadero\b/g, 'true')
+            .replace(/\bfalso\b/g,     'false')
+            .replace(/\bnulo\b/g,      'null')
+        return JSON.parse(fixed)
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
+const apiGet = async (url, timeout = 20000) => {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeout)
+    try {
+        const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36',
+                'Accept': 'application/json'
             }
         })
         if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -35,8 +59,6 @@ const apiGet = async (url, timeout = 20000, extraHeaders = {}) => {
         clearTimeout(timer)
     }
 }
-
-const nexGet = (url) => apiGet(url, 20000, { 'x-api-key': NEX_KEY })
 
 const formatViews = (views) => {
     try {
@@ -54,14 +76,14 @@ const searchYoutube = async (query) => {
 
     // ── 1. NexEvo search/youtube — principal ──
     try {
-        const r = await nexGet(`${NEX_BASE}/search/youtube?q=${encodeURIComponent(query)}&apikey=${NEX_KEY}`)
+        const r = await nexFetch(`${NEX_BASE}/search/youtube?q=${encodeURIComponent(query)}&apikey=${NEX_KEY}`)
         if (r?.status && r?.result?.length) {
-            // Filtrar videos muy cortos (shorts) — preferir duración > 1min
+            // Preferir videos de más de 1 minuto (evitar shorts)
             const filtered = r.result.filter(v => {
                 const parts = (v.duration || '0:00').split(':')
-                const secs  = parts.length === 2
-                    ? parseInt(parts[0]) * 60 + parseInt(parts[1])
-                    : parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
+                const secs  = parts.length >= 2
+                    ? parseInt(parts[parts.length - 2]) * 60 + parseInt(parts[parts.length - 1])
+                    : 0
                 return secs >= 60
             })
             const s = filtered[0] || r.result[0]
@@ -140,10 +162,11 @@ const searchYoutube = async (query) => {
 const getAudio = async (url) => {
     const fuentes = [
         {
+            // NexEvo devuelve JSON con español — usar nexFetch
             nombre: 'NexEvo download/audio',
             fn: async () => {
-                const r = await nexGet(`${NEX_BASE}/download/audio?url=${encodeURIComponent(url)}&apikey=${NEX_KEY}`)
-                // Respuesta en español: { estado, resultado: { url } }
+                const r = await nexFetch(`${NEX_BASE}/download/audio?url=${encodeURIComponent(url)}&apikey=${NEX_KEY}`)
+                console.log('[PLAY] NexEvo raw:', JSON.stringify(r).slice(0, 100))
                 return r?.estado ? (r.resultado?.url || null) : null
             }
         },
@@ -225,8 +248,8 @@ let handler = async (m, { conn, command, text }) => {
         if (isYtLink) {
             const videoId = query.match(/(?:youtu\.be\/|watch\?v=)([a-zA-Z0-9_-]{11})/)?.[1]
             song = {
-                title: 'YouTube Video',
-                url:   query,
+                title:    'YouTube Video',
+                url:      query,
                 author:   'N/A',
                 duration: 'N/A',
                 views:    'N/A',
