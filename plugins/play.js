@@ -1,11 +1,14 @@
 /**
  * PLAY - NINO NAKANO 🦋
  * Descarga audio de YouTube
+ * API Principal: NexEvo (nex-magical.vercel.app)
+ * Fallback: AlyaBot → GiftedTech
  * Comandos: #play, #mp3, #ytmp3, #musica
- * Sin yt-search ni node-fetch — fetch global Node 18+
  * Z0RT SYSTEMS
  */
 
+const NEX_BASE   = 'https://nex-magical.vercel.app'
+const NEX_KEY    = 'NEX-D0E7E64C8F5E44E98F00D6B4'
 const ALYA_BASE  = 'https://rest.alyabotpe.xyz'
 const ALYA_KEY   = 'Duarte-zz12'
 const GIFTED_API = 'https://api.giftedtech.co.ke/api'
@@ -21,7 +24,8 @@ const apiGet = async (url, timeout = 20000) => {
             signal: controller.signal,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-                'Accept': 'application/json'
+                'Accept': 'application/json',
+                'x-api-key': NEX_KEY
             }
         })
         if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -41,11 +45,11 @@ const formatViews = (views) => {
     } catch { return String(views || 0) }
 }
 
-// ─── BÚSQUEDA YOUTUBE — sin scraping ─────────────────────────────────────────
+// ─── BÚSQUEDA YOUTUBE ─────────────────────────────────────────────────────────
 
 const searchYoutube = async (query) => {
 
-    // ── 1. AlyaBot youtubeplay (busca + link de descarga en 1 call) ──
+    // ── 1. AlyaBot youtubeplay (busca + descarga en 1 call) ──
     try {
         const r = await apiGet(`${ALYA_BASE}/dl/youtubeplay?query=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
         if (r?.status && (r.data?.title || r.result?.title)) {
@@ -100,23 +104,6 @@ const searchYoutube = async (query) => {
         }
     } catch (e) { console.log('[PLAY] GiftedTech ytsearch falló:', e.message) }
 
-    // ── 4. GiftedTech ytdl ──
-    try {
-        const r = await apiGet(`${GIFTED_API}/download/ytdl?apikey=${GIFTED_KEY}&url=${encodeURIComponent(query)}`)
-        if (r?.result?.title) {
-            console.log('[PLAY] OK GiftedTech ytdl:', r.result.title)
-            return {
-                title:     r.result.title,
-                url:       r.result.videoUrl || query,
-                author:    r.result.channel  || 'Desconocido',
-                duration:  r.result.duration || 'N/A',
-                views:     'N/A',
-                thumb:     r.result.thumbnail || '',
-                directUrl: r.result.url || null
-            }
-        }
-    } catch (e) { console.log('[PLAY] GiftedTech ytdl falló:', e.message) }
-
     return null
 }
 
@@ -124,6 +111,15 @@ const searchYoutube = async (query) => {
 
 const getAudio = async (url) => {
     const fuentes = [
+        {
+            // ✅ NexEvo — API principal
+            nombre: 'NexEvo download/audio',
+            fn: async () => {
+                const r = await apiGet(`${NEX_BASE}/download/audio?url=${encodeURIComponent(url)}&apikey=${NEX_KEY}`)
+                // Respuesta: { estado, resultado: { url, info: { miniatura, título, duración, canal } } }
+                return r?.estado ? (r.resultado?.url || null) : null
+            }
+        },
         {
             nombre: 'AlyaBot ytmp3v2',
             fn: async () => {
@@ -156,6 +152,7 @@ const getAudio = async (url) => {
 
     for (const { nombre, fn } of fuentes) {
         try {
+            console.log('[PLAY] Intentando:', nombre)
             const link = await fn()
             if (link && String(link).startsWith('http')) {
                 console.log('[PLAY] Audio OK:', nombre)
@@ -200,7 +197,15 @@ let handler = async (m, { conn, command, text }) => {
         const isYtLink = query.includes('youtube.com/watch') || query.includes('youtu.be/')
 
         if (isYtLink) {
-            song = { title: query, url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
+            // Link directo — intentar obtener info extra desde NexEvo
+            song = { title: 'YouTube Video', url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
+
+            // Extraer thumbnail desde YouTube directamente
+            const videoId = query.match(/(?:youtu\.be\/|watch\?v=)([a-zA-Z0-9_-]{11})/)?.[1]
+            if (videoId) {
+                song.thumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
+                song.title = query
+            }
         } else {
             song = await searchYoutube(query)
         }
@@ -257,7 +262,7 @@ let handler = async (m, { conn, command, text }) => {
 
         await m.react('⬇️')
 
-        // ── 3. Obtener URL de descarga ──
+        // ── 3. Obtener URL de descarga (NexEvo primero) ──
         const audioUrl = song.directUrl || await getAudio(song.url)
 
         // ── 4. Descargar buffer ──
