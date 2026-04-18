@@ -1,25 +1,20 @@
 /**
  * PLAY - NINO NAKANO
  * #play (audio) | #playvid (video)
- * Sin yt-search ni node-fetch — usa fetch global de Node 18+
  * Z0RT SYSTEMS 🦋
  */
 
 const ALYA_BASE  = 'https://rest.alyabotpe.xyz'
 const ALYA_KEY   = 'Duarte-zz12'
-const GIFTED_API = 'https://api.giftedtech.co.ke/api'
-const GIFTED_KEY = 'Fedex'
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-
-const apiGet = async (url, timeout = 20000) => {
+const apiGet = async (url, timeout = 25000) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
     try {
         const res = await fetch(url, {
             signal: controller.signal,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                 'Accept': 'application/json'
             }
         })
@@ -40,159 +35,28 @@ const formatViews = (views) => {
     } catch { return String(views || 0) }
 }
 
-// ─── BÚSQUEDA YOUTUBE — sin scraping, solo APIs ───────────────────────────────
-
 const searchYoutube = async (query) => {
-
-    // ── 1. AlyaBot youtubeplay (busca + descarga en 1 call) ──
-    try {
-        const r = await apiGet(`${ALYA_BASE}/dl/youtubeplay?query=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
-        if (r?.status && (r.data?.title || r.result?.title)) {
-            const d = r.data || r.result
-            console.log('[PLAY] OK AlyaBot youtubeplay:', d.title)
-            return {
-                title:     d.title    || query,
-                url:       d.videoUrl || d.url || '',
-                author:    d.channel  || 'Desconocido',
-                duration:  d.duration || 'N/A',
-                views:     'N/A',
-                thumb:     d.thumbnail || '',
-                directUrl: d.download  || d.dl || null
-            }
-        }
-    } catch (e) { console.log('[PLAY] AlyaBot youtubeplay falló:', e.message) }
-
-    // ── 2. AlyaBot search ──
     try {
         const r = await apiGet(`${ALYA_BASE}/search/youtube?q=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
-        const list = r?.data || r?.result || r?.results || []
+        const list = r?.data || r?.result || []
         const s = Array.isArray(list) ? list[0] : list
         if (s?.title) {
-            const vid = s.id || s.videoId
-            console.log('[PLAY] OK AlyaBot search:', s.title)
             return {
                 title:    s.title,
-                url:      vid ? `https://youtube.com/watch?v=${vid}` : s.url || '',
-                author:   s.channel  || s.author || 'Desconocido',
+                url:      s.id ? `https://youtube.com/watch?v=${s.id}` : s.url || '',
+                author:   s.channel || s.author || 'Desconocido',
                 duration: s.duration || s.length || 'N/A',
-                views:    formatViews(s.views || s.viewCount || 0),
+                views:    formatViews(s.views || 0),
                 thumb:    s.thumbnail || s.image || ''
             }
         }
-    } catch (e) { console.log('[PLAY] AlyaBot search falló:', e.message) }
-
-    // ── 3. GiftedTech ytsearch ──
-    try {
-        const r = await apiGet(`${GIFTED_API}/search/ytsearch?apikey=${GIFTED_KEY}&q=${encodeURIComponent(query)}`)
-        const s = r?.result?.[0] || r?.results?.[0] || r?.data?.[0]
-        if (s?.title) {
-            const vid = s.id || s.videoId
-            console.log('[PLAY] OK GiftedTech ytsearch:', s.title)
-            return {
-                title:    s.title,
-                url:      vid ? `https://youtube.com/watch?v=${vid}` : s.url || '',
-                author:   s.channel  || s.author || 'Desconocido',
-                duration: s.duration || s.length || 'N/A',
-                views:    formatViews(s.views || s.viewCount || 0),
-                thumb:    s.thumbnail || s.image || ''
-            }
-        }
-    } catch (e) { console.log('[PLAY] GiftedTech ytsearch falló:', e.message) }
-
-    // ── 4. GiftedTech ytdl ──
-    try {
-        const r = await apiGet(`${GIFTED_API}/download/ytdl?apikey=${GIFTED_KEY}&url=${encodeURIComponent(query)}`)
-        if (r?.result?.title) {
-            console.log('[PLAY] OK GiftedTech ytdl:', r.result.title)
-            return {
-                title:     r.result.title,
-                url:       r.result.videoUrl || query,
-                author:    r.result.channel  || 'Desconocido',
-                duration:  r.result.duration || 'N/A',
-                views:     'N/A',
-                thumb:     r.result.thumbnail || '',
-                directUrl: r.result.url || null
-            }
-        }
-    } catch (e) { console.log('[PLAY] GiftedTech ytdl falló:', e.message) }
-
+    } catch (e) { console.log(e.message) }
     return null
 }
 
-// ─── DESCARGA AUDIO ───────────────────────────────────────────────────────────
-
-const getAudio = async (url) => {
-    const fuentes = [
-        {
-            nombre: 'AlyaBot ytmp3v2',
-            fn: async () => {
-                const r = await apiGet(`${ALYA_BASE}/dl/ytmp3v2?url=${encodeURIComponent(url)}&key=${ALYA_KEY}`)
-                return r?.status ? (r.data?.dl || r.data?.url || r.data?.download) : null
-            }
-        },
-        {
-            nombre: 'AlyaBot ytmp3',
-            fn: async () => {
-                const r = await apiGet(`${ALYA_BASE}/dl/ytmp3?url=${encodeURIComponent(url)}&key=${ALYA_KEY}`)
-                return r?.status ? (r.data?.dl || r.data?.url || r.data?.download) : null
-            }
-        },
-        {
-            nombre: 'GiftedTech ytmp3',
-            fn: async () => {
-                const r = await apiGet(`${GIFTED_API}/download/ytmp3?apikey=${GIFTED_KEY}&url=${encodeURIComponent(url)}`)
-                return r?.result?.downloadUrl || r?.result?.url || r?.result?.audio || null
-            }
-        }
-    ]
-    for (const { nombre, fn } of fuentes) {
-        try {
-            const link = await fn()
-            if (link && String(link).startsWith('http')) {
-                console.log('[PLAY] Audio OK:', nombre)
-                return link
-            }
-        } catch (e) { console.log('[PLAY] Falló', nombre + ':', e.message) }
-    }
-    throw new Error('Ninguna API pudo obtener el audio')
-}
-
-// ─── DESCARGA VIDEO ───────────────────────────────────────────────────────────
-
-const getVideo = async (url) => {
-    const fuentes = [
-        {
-            nombre: 'AlyaBot ytmp4',
-            fn: async () => {
-                const r = await apiGet(`${ALYA_BASE}/dl/ytmp4?url=${encodeURIComponent(url)}&key=${ALYA_KEY}`)
-                return r?.status ? (r.data?.dl || r.data?.url || r.data?.download) : null
-            }
-        },
-        {
-            nombre: 'GiftedTech ytmp4',
-            fn: async () => {
-                const r = await apiGet(`${GIFTED_API}/download/ytmp4?apikey=${GIFTED_KEY}&url=${encodeURIComponent(url)}`)
-                return r?.result?.downloadUrl || r?.result?.url || r?.result?.video || null
-            }
-        }
-    ]
-    for (const { nombre, fn } of fuentes) {
-        try {
-            const link = await fn()
-            if (link && String(link).startsWith('http')) {
-                console.log('[PLAYVID] Video OK:', nombre)
-                return link
-            }
-        } catch (e) { console.log('[PLAYVID] Falló', nombre + ':', e.message) }
-    }
-    throw new Error('Ninguna API pudo obtener el video')
-}
-
-// ─── HANDLER ──────────────────────────────────────────────────────────────────
-
 const handler = async (m, { conn, command, text }) => {
     const cmd     = command.toLowerCase()
-    const isVideo = cmd.includes('vid') || cmd.includes('v') || cmd === 'playv'
+    const isVideo = ["playvid", "ytmp4", "play2", "playv"].includes(cmd)
     const query   = (text || '').trim()
 
     if (!query) return m.reply(
@@ -204,25 +68,31 @@ const handler = async (m, { conn, command, text }) => {
     await m.react('🔍')
 
     try {
-        // ── 1. Resolver búsqueda o link directo ──
         let song = null
-        const isYtLink = query.includes('youtube.com/watch') || query.includes('youtu.be/')
+        const isYtLink = query.startsWith('https://')
 
         if (isYtLink) {
-            song = { title: 'YouTube Video', url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
+            song = { title: 'YouTube Media', url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
         } else {
             song = await searchYoutube(query)
         }
 
         if (!song?.url) {
             await m.react('❌')
-            return m.reply(`❌ No encontré resultados para *${query}*\n\n_Intenta con el link directo o un nombre más específico_`)
+            return m.reply(`❌ No encontré resultados para *${query}*`)
         }
 
         await m.react(isVideo ? '🎬' : '🎵')
 
-        // ── 2. Obtener URL de descarga ──
-        const finalUrl = song.directUrl || (isVideo ? await getVideo(song.url) : await getAudio(song.url))
+        const apiUrl = isVideo 
+            ? `https://api-gohan.onrender.com/download/ytvideo?url=${encodeURIComponent(song.url)}`
+            : `https://api-gohan.onrender.com/download/ytaudio?url=${encodeURIComponent(song.url)}`
+
+        const response = await fetch(apiUrl)
+        const data = await response.json()
+        const finalUrl = data?.result?.download_url
+
+        if (!finalUrl) throw new Error('Error en la API de descarga.')
 
         const caption =
             `🎵 *${song.title}*\n` +
@@ -247,12 +117,8 @@ const handler = async (m, { conn, command, text }) => {
                 contextInfo: ctx
             }, { quoted: m })
         } else {
-            const audioRes = await fetch(finalUrl)
-            if (!audioRes.ok) throw new Error('Error al descargar audio: HTTP ' + audioRes.status)
-            const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
-
             await conn.sendMessage(m.chat, {
-                audio: audioBuffer,
+                audio: { url: finalUrl },
                 mimetype: 'audio/mpeg',
                 ptt: false,
                 contextInfo: ctx
@@ -273,13 +139,13 @@ const handler = async (m, { conn, command, text }) => {
         await m.react('✅')
 
     } catch (e) {
-        console.error('[PLAY ERROR]', e.message)
         await m.react('❌')
-        m.reply(`❌ *Error al procesar*\n\n⚠️ ${e.message}\n\n_Intenta de nuevo en unos segundos_ 🦋`)
+        m.reply(`❌ *Error*\n\n⚠️ ${e.message}`)
     }
 }
 
 handler.help    = ['play', 'playvid']
 handler.tags    = ['descargas']
-handler.command = ['play', 'playvid', 'playv', 'musica']
+handler.command = ['play', 'playvid', 'playv', 'musica', 'ytmp3', 'ytmp4', 'play2']
+
 export default handler
