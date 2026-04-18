@@ -2,7 +2,8 @@
  * PLAY - NINO NAKANO 🦋
  * Descarga audio de YouTube
  * API Principal: NexEvo (nex-magical.vercel.app)
- * Fallback: AlyaBot → GiftedTech
+ * Fallback búsqueda: AlyaBot → GiftedTech
+ * Fallback descarga: AlyaBot → GiftedTech
  * Comandos: #play, #mp3, #ytmp3, #musica
  * Z0RT SYSTEMS
  */
@@ -16,7 +17,7 @@ const GIFTED_KEY = 'Fedex'
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
-const apiGet = async (url, timeout = 20000) => {
+const apiGet = async (url, timeout = 20000, extraHeaders = {}) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeout)
     try {
@@ -25,7 +26,7 @@ const apiGet = async (url, timeout = 20000) => {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Linux; Android 15; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
                 'Accept': 'application/json',
-                'x-api-key': NEX_KEY
+                ...extraHeaders
             }
         })
         if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -34,6 +35,8 @@ const apiGet = async (url, timeout = 20000) => {
         clearTimeout(timer)
     }
 }
+
+const nexGet = (url) => apiGet(url, 20000, { 'x-api-key': NEX_KEY })
 
 const formatViews = (views) => {
     try {
@@ -49,7 +52,32 @@ const formatViews = (views) => {
 
 const searchYoutube = async (query) => {
 
-    // ── 1. AlyaBot youtubeplay (busca + descarga en 1 call) ──
+    // ── 1. NexEvo search/youtube — principal ──
+    try {
+        const r = await nexGet(`${NEX_BASE}/search/youtube?q=${encodeURIComponent(query)}&apikey=${NEX_KEY}`)
+        if (r?.status && r?.result?.length) {
+            // Filtrar videos muy cortos (shorts) — preferir duración > 1min
+            const filtered = r.result.filter(v => {
+                const parts = (v.duration || '0:00').split(':')
+                const secs  = parts.length === 2
+                    ? parseInt(parts[0]) * 60 + parseInt(parts[1])
+                    : parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
+                return secs >= 60
+            })
+            const s = filtered[0] || r.result[0]
+            console.log('[PLAY] OK NexEvo search:', s.title)
+            return {
+                title:    s.title,
+                url:      s.link,
+                author:   s.channel  || 'Desconocido',
+                duration: s.duration || 'N/A',
+                views:    'N/A',
+                thumb:    s.imageUrl || ''
+            }
+        }
+    } catch (e) { console.log('[PLAY] NexEvo search falló:', e.message) }
+
+    // ── 2. AlyaBot youtubeplay ──
     try {
         const r = await apiGet(`${ALYA_BASE}/dl/youtubeplay?query=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
         if (r?.status && (r.data?.title || r.result?.title)) {
@@ -67,7 +95,7 @@ const searchYoutube = async (query) => {
         }
     } catch (e) { console.log('[PLAY] AlyaBot youtubeplay falló:', e.message) }
 
-    // ── 2. AlyaBot search ──
+    // ── 3. AlyaBot search ──
     try {
         const r = await apiGet(`${ALYA_BASE}/search/youtube?q=${encodeURIComponent(query)}&key=${ALYA_KEY}`)
         const list = r?.data || r?.result || r?.results || []
@@ -86,7 +114,7 @@ const searchYoutube = async (query) => {
         }
     } catch (e) { console.log('[PLAY] AlyaBot search falló:', e.message) }
 
-    // ── 3. GiftedTech ytsearch ──
+    // ── 4. GiftedTech ytsearch ──
     try {
         const r = await apiGet(`${GIFTED_API}/search/ytsearch?apikey=${GIFTED_KEY}&q=${encodeURIComponent(query)}`)
         const s = r?.result?.[0] || r?.results?.[0] || r?.data?.[0]
@@ -112,11 +140,10 @@ const searchYoutube = async (query) => {
 const getAudio = async (url) => {
     const fuentes = [
         {
-            // ✅ NexEvo — API principal
             nombre: 'NexEvo download/audio',
             fn: async () => {
-                const r = await apiGet(`${NEX_BASE}/download/audio?url=${encodeURIComponent(url)}&apikey=${NEX_KEY}`)
-                // Respuesta: { estado, resultado: { url, info: { miniatura, título, duración, canal } } }
+                const r = await nexGet(`${NEX_BASE}/download/audio?url=${encodeURIComponent(url)}&apikey=${NEX_KEY}`)
+                // Respuesta en español: { estado, resultado: { url } }
                 return r?.estado ? (r.resultado?.url || null) : null
             }
         },
@@ -168,7 +195,6 @@ const getAudio = async (url) => {
 let handler = async (m, { conn, command, text }) => {
     const query = (text || '').trim()
 
-    // ── Sin query → menú de ayuda ──
     if (!query) {
         const thumb = await global.getBannerThumb()
         const ctx   = global.getNewsletterCtx(thumb, `🎵 ${global.botName}`, 'Music Downloader')
@@ -197,14 +223,14 @@ let handler = async (m, { conn, command, text }) => {
         const isYtLink = query.includes('youtube.com/watch') || query.includes('youtu.be/')
 
         if (isYtLink) {
-            // Link directo — intentar obtener info extra desde NexEvo
-            song = { title: 'YouTube Video', url: query, author: 'N/A', duration: 'N/A', views: 'N/A', thumb: '' }
-
-            // Extraer thumbnail desde YouTube directamente
             const videoId = query.match(/(?:youtu\.be\/|watch\?v=)([a-zA-Z0-9_-]{11})/)?.[1]
-            if (videoId) {
-                song.thumb = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-                song.title = query
+            song = {
+                title: 'YouTube Video',
+                url:   query,
+                author:   'N/A',
+                duration: 'N/A',
+                views:    'N/A',
+                thumb:    videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : ''
             }
         } else {
             song = await searchYoutube(query)
@@ -226,7 +252,7 @@ let handler = async (m, { conn, command, text }) => {
             }, { quoted: m })
         }
 
-        // ── 2. Enviar thumbnail con info mientras descarga ──
+        // ── 2. Enviar thumbnail con info ──
         const caption =
             `╭━━━━━━━━━━━━━━━━╮\n` +
             `┃  🎵 *NINO MUSIC* 🎵\n` +
@@ -239,47 +265,28 @@ let handler = async (m, { conn, command, text }) => {
             `𐙚 ❀ ｡ ↻ _Dame un momento, ya te envío el audio~_ 🦋`
 
         const thumb = await global.getBannerThumb()
-        const ctx   = global.getNewsletterCtx(
-            thumb,
-            song.title.slice(0, 60),
-            global.botName + ' Music 🎵'
-        )
+        const ctx   = global.getNewsletterCtx(thumb, song.title.slice(0, 60), global.botName + ' Music 🎵')
         ctx.externalAdReply.thumbnailUrl = song.thumb || global.banner
         ctx.externalAdReply.sourceUrl    = song.url
 
         if (song.thumb) {
-            await conn.sendMessage(m.chat, {
-                image:       { url: song.thumb },
-                caption,
-                contextInfo: ctx
-            }, { quoted: m })
+            await conn.sendMessage(m.chat, { image: { url: song.thumb }, caption, contextInfo: ctx }, { quoted: m })
         } else {
-            await conn.sendMessage(m.chat, {
-                text:        caption,
-                contextInfo: ctx
-            }, { quoted: m })
+            await conn.sendMessage(m.chat, { text: caption, contextInfo: ctx }, { quoted: m })
         }
 
         await m.react('⬇️')
 
-        // ── 3. Obtener URL de descarga (NexEvo primero) ──
-        const audioUrl = song.directUrl || await getAudio(song.url)
-
-        // ── 4. Descargar buffer ──
-        const audioRes = await fetch(audioUrl)
+        // ── 3. Descargar audio ──
+        const audioUrl    = song.directUrl || await getAudio(song.url)
+        const audioRes    = await fetch(audioUrl)
         if (!audioRes.ok) throw new Error('Error al descargar: HTTP ' + audioRes.status)
         const audioBuffer = Buffer.from(await audioRes.arrayBuffer())
 
-        if (!audioBuffer || audioBuffer.length < 1000) {
-            throw new Error('El audio descargado está vacío o corrupto')
-        }
+        if (!audioBuffer || audioBuffer.length < 1000) throw new Error('El audio está vacío o corrupto')
 
-        // ── 5. Enviar audio ──
-        const audioCtx = global.getNewsletterCtx(
-            thumb,
-            song.title.slice(0, 60),
-            global.botName + ' Music 🎵'
-        )
+        // ── 4. Enviar audio ──
+        const audioCtx = global.getNewsletterCtx(thumb, song.title.slice(0, 60), global.botName + ' Music 🎵')
         audioCtx.externalAdReply.thumbnailUrl = song.thumb || global.banner
         audioCtx.externalAdReply.sourceUrl    = song.url
 
@@ -296,7 +303,6 @@ let handler = async (m, { conn, command, text }) => {
     } catch (e) {
         console.error('[PLAY ERROR]', e.message)
         await m.react('❌')
-
         const thumb = await global.getBannerThumb()
         const ctx   = global.getNewsletterCtx(thumb, `❌ ${global.botName}`, 'Error')
         return conn.sendMessage(m.chat, {
