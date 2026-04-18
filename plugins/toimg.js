@@ -13,7 +13,7 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 
 const execAsync = promisify(exec)
-const tmpFile   = (ext) => join(tmpdir(), `nino_toimg_${Date.now()}.${ext}`)
+const tmpFile   = (ext) => join(tmpdir(), `nino_toimg_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`)
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 
@@ -25,6 +25,38 @@ const sendToimg = async (conn, m, text, isError = false) => {
         isError ? 'Error al convertir' : 'Sticker → Imagen'
     )
     return conn.sendMessage(m.chat, { text, contextInfo: ctx }, { quoted: m })
+}
+
+// Desenvuelve el mensaje real (puede venir en viewOnce, ephemeral, etc.)
+const unwrap = (msg) => {
+    if (!msg) return null
+    return msg.viewOnceMessage?.message
+        || msg.ephemeralMessage?.message
+        || msg.documentWithCaptionMessage?.message
+        || msg
+}
+
+// Extrae el mensaje con media desde el quoted
+const getMediaMsg = (m) => {
+    // 1. Intentar desde m.quoted directamente
+    if (m.quoted?.message) {
+        const msg = unwrap(m.quoted.message)
+        if (msg?.stickerMessage || msg?.videoMessage || msg?.imageMessage) return msg
+    }
+
+    // 2. Intentar desde m.quoted.quoted (cuando se cita un forward)
+    if (m.quoted?.quoted?.message) {
+        const msg = unwrap(m.quoted.quoted.message)
+        if (msg?.stickerMessage || msg?.videoMessage || msg?.imageMessage) return msg
+    }
+
+    // 3. Intentar desde el mensaje actual
+    if (m.message) {
+        const msg = unwrap(m.message)
+        if (msg?.stickerMessage || msg?.videoMessage || msg?.imageMessage) return msg
+    }
+
+    return null
 }
 
 // Sticker WebP → PNG
@@ -42,12 +74,11 @@ const webpToPng = async (buffer) => {
 }
 
 // Video/GIF → primer frame PNG
-const videoToPng = async (buffer, ext = 'mp4') => {
-    const input  = tmpFile(ext)
+const videoToPng = async (buffer) => {
+    const input  = tmpFile('mp4')
     const output = tmpFile('png')
     try {
         await writeFile(input, buffer)
-        // -vframes 1 = solo el primer frame
         await execAsync(`ffmpeg -y -i "${input}" -vframes 1 "${output}"`)
         return await readFile(output)
     } finally {
@@ -59,8 +90,7 @@ const videoToPng = async (buffer, ext = 'mp4') => {
 // ─── HANDLER ──────────────────────────────────────────────────────────────────
 
 let handler = async (m, { conn }) => {
-    const quoted = m.quoted || m
-    const msg    = quoted?.message || m.message
+    const msg = getMediaMsg(m)
 
     if (!msg) {
         return sendToimg(conn, m,
@@ -79,37 +109,28 @@ let handler = async (m, { conn }) => {
     const gifMsg     = videoMsg?.gifPlayback ? videoMsg : null
     const imageMsg   = msg.imageMessage
 
-    const hasMedia = stickerMsg || videoMsg || imageMsg
-
-    if (!hasMedia) {
-        return sendToimg(conn, m,
-            `🖼️ Responde a un *sticker*, *video* o *GIF* para convertirlo~\n\n` +
-            `_No detecté ningún tipo de media compatible_ 🦋`
-        )
-    }
-
     await m.react('⏳')
 
     try {
         let pngBuffer
         let tipo = ''
 
+        // Usamos m.quoted para descargar, con fallback a m
+        const target = m.quoted || m
+
         if (stickerMsg) {
-            // ── Sticker WebP → PNG ──
             tipo = 'Sticker'
-            const buffer = await conn.downloadMediaMessage(quoted)
+            const buffer = await conn.downloadMediaMessage(target)
             pngBuffer = await webpToPng(buffer)
 
         } else if (gifMsg || videoMsg) {
-            // ── Video / GIF → primer frame ──
             tipo = gifMsg ? 'GIF' : 'Video'
-            const buffer = await conn.downloadMediaMessage(quoted)
-            pngBuffer = await videoToPng(buffer, 'mp4')
+            const buffer = await conn.downloadMediaMessage(target)
+            pngBuffer = await videoToPng(buffer)
 
         } else if (imageMsg) {
-            // ── Imagen ya es imagen, solo re-enviar ──
             tipo = 'Imagen'
-            pngBuffer = await conn.downloadMediaMessage(quoted)
+            pngBuffer = await conn.downloadMediaMessage(target)
         }
 
         if (!pngBuffer || pngBuffer.length < 100) {
