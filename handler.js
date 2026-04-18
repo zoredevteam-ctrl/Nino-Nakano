@@ -146,8 +146,6 @@ export const handler = async (m, conn, plugins) => {
         }
 
         // ── Ejecutar handler.before de todos los plugins ──────────────────────
-        // ✅ FIX: el before NUNCA bloquea mensajes con prefijo (#menu, #play, etc.)
-        // Solo actúa en mensajes sin prefijo (respuestas de juegos, spam, links)
         if (m.isGroup) {
             const bodyCheck = (m.body || '').trim()
             const tienePrefix = ['#', '.', '/', '$'].some(p => bodyCheck.startsWith(p))
@@ -341,68 +339,113 @@ export const handler = async (m, conn, plugins) => {
                     who = rawNum + '@s.whatsapp.net';
                 }
             } else {
-                // ✅ FIX MENCIONES: normalizar siempre a @s.whatsapp.net
                 who = rawNum + '@s.whatsapp.net';
             }
         }
 
-        // ── Validaciones ──────────────────────────────────────────────────────
+        // ════════════════════════════════════════════════════════════════════
+        // VALIDACIONES — Estilo Nino Nakano 🦋
+        // ════════════════════════════════════════════════════════════════════
 
-        // Modo admin
+        // Modo admin del grupo
         if (isGroup && database.data.groups[m.chat]?.modoadmin && !isAdmin && !isOwner) {
-            return m.reply(`⚙️ *MODO ADMIN*\nEn este momento solo obedezco a los administradores~ Ni lo intentes 💅`)
+            return m.reply(
+                `*ᐛ🎀* Este reino está en *modo administrador.*\n` +
+                `> ✰ Solo los elegidos del grupo pueden hablar ahora. Tú no eres uno de ellos~ 💅`
+            )
         }
 
-        // Modo owner
+        // Modo owner global
         if (database.data.settings?.modoowner && !isOwner) {
-            return m.reply(`👑 *MODO OWNER*\nEstoy en modo exclusivo ahora mismo. Solo mis dueños pueden hablar conmigo~ 🦋`)
+            return m.reply(
+                `*ᐛ🎀* Estoy en modo exclusivo ahora mismo.\n` +
+                `> ✰ Solo mis creadores pueden hablar conmigo en este momento~ 🦋`
+            )
         }
 
         // Baneado
         if (database.data.users[senderJid]?.banned && !isOwner) {
-            return m.reply(`🚫 *BANEADO*\n¿De verdad pensaste que te iba a dejar usar mis comandos? Estás fuera, bye 💢`)
+            return m.reply(
+                `*ᐛ🎀* Fuiste desterrado de mi reino.\n` +
+                `> ✰ No puedes usar mis comandos. Habla con mi creador si crees que es un error~ 💢`
+            )
         }
 
+        // Solo root owner
         if (cmd.rowner && !isROwner) {
             return m.reply(isOwner
-                ? `Mi amor, este comando es solo para ti, mi creador principal 💖`
-                : `👑 *SOLO PARA EL CREADOR*\n¿Y tú quién te crees? Este código es solo para mi creador. 😤`)
+                ? `*ᐛ🎀* Mi amor, esta función es exclusiva de mi *creador principal.*\n` +
+                  `> ✰ Ni tú puedes tocarla~ Solo él 💖`
+                : `*ᐛ🎀* Esta función solo puede ser usada por mi *creador.*\n` +
+                  `> ✰ 𝓐𝓪𝓻𝓸𝓶 (•̀ᴗ•́)و 🦋`
+            )
         }
 
+        // Solo owner
         if (cmd.owner && !isOwner) {
-            return m.reply(`👑 *ACCESO RESTRINGIDO*\nSolo mis dueños pueden tocar esto. Tú no entras en esa lista~ 💅`)
+            return m.reply(
+                `*ᐛ🎀* Esta función solo puede ser usada por mis *creadores.*\n` +
+                `> ✰ ¿Y tú quién eres exactamente? (•̀ᴗ•́)و 🦋`
+            )
         }
 
+        // Solo premium
         if (cmd.premium && !isPremium) {
-            return m.reply(`💎 *SOLO PREMIUM*\nUgh, qué pobre… Necesitas ser Premium para que te haga caso. Consigue uno y hablamos 🙄`)
+            return m.reply(
+                `*ᐛ🎀* Esta función es exclusiva para los *ciudadanos premium* de mi reino.\n` +
+                `> ✰ Consigue Premium y hablamos, por ahora... no entras~ 💎`
+            )
         }
 
+        // Registro requerido
         if (cmd.register && !isRegistered) {
-            return m.reply(`📝 *NO ESTÁS REGISTRADO*\nNo hablo con extraños, sorry. Regístrate primero si quieres mi atención.\n\n> Usa: *${prefix}reg nombre.edad*\n> Ejemplo: *${prefix}reg tonto.18* 🦋`)
+            return m.reply(
+                `*ᐛ🎀* No hablo con extraños sin identificación.\n` +
+                `> ✰ Regístrate con *${prefix}reg nombre.edad* y luego hablamos~ 📝`
+            )
         }
 
+        // Solo grupos
         if (cmd.group && !isGroup) {
-            return m.reply(`🏢 *SOLO EN GRUPOS*\nEsto solo funciona en grupos, no en privado. ¿Qué intentas hacer aquí solito? 🙄`)
+            return m.reply(
+                `*ᐛ🎀* Esta función encantada solo puede usarse en *reinos de poder (grupos).*\n` +
+                `> ✰ Ve a un grupo y vuelve a intentarlo~ 🏰`
+            )
         }
 
+        // Solo admins
         if (cmd.admin && !isAdmin) {
             return m.reply(isOwner
-                ? `Tú eres mi dueño, no necesitas ser admin mi cielo 💕`
-                : `👮 *SOLO ADMINS*\nNo recibo órdenes de cualquiera. Consigue admin y luego hablamos, cariño 💅`)
+                ? `*ᐛ🎀* Tú eres mi creador, no necesitas ser admin mi cielo~ 💕`
+                : `*ᐛ🎀* Esta función solo puede ser ejecutada por las *personas más importantes del reino (admins).*\n` +
+                  `> ✰ Consigue admin y luego regresa~ 👑`
+            )
         }
 
+        // Bot necesita ser admin
         if (cmd.botAdmin && !isBotAdmin) {
-            return m.reply(`🤖 *NECESITO SER ADMIN*\n¿Quieres que haga el trabajo pero no me das administrador? Qué inútil… Dame admin primero 😒`)
+            return m.reply(
+                `*ᐛ🎀* Esta función solo puede ejecutarse si yo soy *princesa de este reino (admin del grupo).*\n` +
+                `> ✰ Dame administrador primero y con gusto lo hago~ 😒🦋`
+            )
         }
 
+        // Solo privado
         if (cmd.private && isGroup) {
-            return m.reply(`💬 *SOLO EN PRIVADO*\nEsto es demasiado personal para el grupo… Ven al privado si quieres que te atienda 😳`)
+            return m.reply(
+                `*ᐛ🎀* Esta función encantada solo puede ejecutarse en *mi casa (chat privado).*\n` +
+                `> ✰ Ven al privado si quieres que te atienda~ 💬`
+            )
         }
 
+        // Límite de uso
         if (cmd.limit && !isPremium && !isOwner) {
             const userLimit = database.data.users[senderJid].limit ?? 0;
             if (userLimit < 1) {
-                return m.reply(`⚠️ *LÍMITES AGOTADOS*\nSe te acabaron los diamantes, tonto. Consigue más o vuélvete Premium 💢`)
+                return m.reply(
+                    `*ᐛ🎀* Se te agotaron tus *permisos de uso* por hoy.\n` +
+                    `> ✰ Consigue Premium o vuelve mañana cuando recargues~ 💢`
+                )
             }
             database.data.users[senderJid].limit -= 1;
         }
