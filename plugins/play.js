@@ -4,7 +4,7 @@
  * Z0RT SYSTEMS 🦋
  */
 
-const ALYA_BASE  = 'https://rest.alyabotpe.xyz'
+const ALYA_BASE  = 'https://nex-magical.vercel.app'
 const ALYA_KEY   = 'Duarte-zz12'
 
 const apiGet = async (url, timeout = 25000) => {
