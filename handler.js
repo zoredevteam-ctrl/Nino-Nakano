@@ -259,8 +259,8 @@ export const handler = async (m, conn, plugins) => {
                 : '> _Nada... estás escribiendo puro caos_ 💢';
 
             const textoNoExiste = isOwner
-                ? `Ay mi amorcito, el comando *${prefix + commandName}* no existe 🥺\nPero no te preocupes, yo te ayudo siempre 💕 Usa *${prefix}menu* y te muestro todo lo bonito que tengo para ti~`
-                : `¿Huh? El comando *${prefix + commandName}* no existe, tonto.\n¿Quieres que te ayude o qué? Usa *${prefix}menu* y deja de hacerme perder el tiempo 🙄`;
+                ? `Ay mi creador, el comando *${prefix + commandName}* no existe 🎀\nPero no te preocupes, yo te ayudo siempre Usa *${prefix}menu* y te muestro todo lo bonito que tengo para ti~`
+                : `¿Huh? El comando *${prefix + commandName}* no existe, amigo.\n¿Quieres que te ayude? Usa *${prefix}menu* y te ayudaré 🦋`;
 
             const finalMessage = similares.length
                 ? `${textoNoExiste}\n\n*¿Tal vez quisiste decir...?*\n${sugerencias}`
@@ -351,7 +351,7 @@ export const handler = async (m, conn, plugins) => {
         if (isGroup && database.data.groups[m.chat]?.modoadmin && !isAdmin && !isOwner) {
             return m.reply(
                 `*ᐛ🎀* Este reino está en *modo administrador.*\n` +
-                `> ✰ Solo los elegidos del grupo pueden hablar ahora. Tú no eres uno de ellos~ 💅`
+                `> ✰ Solo los elegidos del grupo pueden hablar ahora. Tú no eres uno de ellos~ 🦋`
             )
         }
 
@@ -426,7 +426,7 @@ export const handler = async (m, conn, plugins) => {
         if (cmd.botAdmin && !isBotAdmin) {
             return m.reply(
                 `*ᐛ🎀* Esta función solo puede ejecutarse si yo soy *princesa de este reino (admin del grupo).*\n` +
-                `> ✰ Dame administrador primero y con gusto lo hago~ 😒🦋`
+                `> ✰ Dame administrador primero y con gusto lo hago~ ✨🦋`
             )
         }
 
