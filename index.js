@@ -35,7 +35,7 @@ const n2 = chalk.hex('#FF69B4')
 const n3 = chalk.hex('#DA70D6')
 const n4 = chalk.hex('#C77DFF')
 
-// ─── BANNER (adaptado para cualquier terminal) ────────────────────────────────
+// ─── BANNER ───────────────────────────────────────────────────────────────────
 const ninoBanner = `
 ${n3('╔══════════════════════════════════════════════╗')}
 ${n3('║')}  ${n2('███╗   ██╗██╗███╗   ██╗ ██████╗')}             ${n3('║')}
@@ -50,17 +50,6 @@ ${n3('║')}  ${chalk.white.bold('  Powered by  𝓐𝓪𝓻𝓸𝓶  |  Z0RT SY
 ${n3('║')}  ${chalk.gray('  Version: ' + (global.botVersion || '1.0.5') + ' | Baileys 7.0.0-rc.9   ')}     ${n3('║')}
 ${n3('╚══════════════════════════════════════════════╝')}
 `
-
-// ─── HELPER: Banner como Buffer ───────────────────────────────────────────────
-const getBannerBuffer = async () => {
-  try {
-    const src = global.banner || ''
-    if (!src) return null
-    if (src.startsWith('data:image')) return Buffer.from(src.split(',')[1], 'base64')
-    const res = await fetch(src)
-    return Buffer.from(await res.arrayBuffer())
-  } catch { return null }
-}
 
 // ─── CARGA DE PLUGINS ─────────────────────────────────────────────────────────
 const plugins = new Map()
@@ -97,7 +86,6 @@ async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState(global.sessionName)
   const { version } = await fetchLatestBaileysVersion()
 
-  // Selección de método (solo la primera vez)
   if (!methodCodeQR && !methodCode && !state.creds.registered && !opcion) {
     console.clear()
     console.log(ninoBanner)
@@ -139,7 +127,6 @@ async function startBot() {
 
   conn.ev.on('creds.update', saveCreds)
 
-  // Vinculación por código numérico (opción 2)
   if ((opcion === '2' || methodCode) && !state.creds.registered) {
     setTimeout(async () => {
       try {
@@ -182,78 +169,18 @@ async function startBot() {
     }
   })
 
-  // ─── BIENVENIDA / DESPEDIDA EN GRUPOS ────────────────────────────────────
-  conn.ev.on('group-participants.update', async anu => {
+  // ─── BIENVENIDA / DESPEDIDA — delega a plugins ────────────────────────────
+  // ✅ Ya no hay lógica aquí — todo está en plugins/welcome.js
+  // Los plugins que tengan handler.participantsUpdate son llamados automáticamente
+  conn.ev.on('group-participants.update', async (anu) => {
     try {
-      const metadata = await conn.groupMetadata(anu.id)
-
-      // ✅ Verificar si el grupo tiene bienvenidas desactivadas
-      const groupData = database.data?.groups?.[anu.id]
-      if (groupData?.noWelcome) return
-
-      for (const num of anu.participants) {
-        // ✅ Obtener foto de perfil del usuario
-        let ppBuffer = null
-        try {
-          const ppUrl = await conn.profilePictureUrl(num, 'image')
-          const ppRes = await fetch(ppUrl)
-          ppBuffer = Buffer.from(await ppRes.arrayBuffer())
-        } catch {
-          // Si no tiene foto, usar el banner del bot como fallback
-          ppBuffer = await getBannerBuffer()
-        }
-
-        if (anu.action === 'add') {
-          const txt = [
-            `💐 ¡Bienvenid@ a *${metadata.subject}*, @${num.split('@')[0]}! 🎀`,
-            ``,
-            `Soy Nino... y aunque no suelo decir esto fácilmente...`,
-            `me alegra que estés aquí. 🌸`,
-            ``,
-            `Espero que te sientas cómodo/a, que respetes a todos`,
-            `y que disfrutes mucho tu tiempo con nosotros. 💕`,
-            ``,
-            `*¡Bienvenid@ de verdad!* 🦋✨`
-          ].join('\n')
-
-          await conn.sendMessage(anu.id, {
-            text: txt,
-            contextInfo: {
-              mentionedJid: [num],
-              externalAdReply: {
-                title: '🌸 ¡Nuevo integrante! 🌸',
-                body: `Bienvenido/a a ${metadata.subject}`,
-                // ✅ thumbnail como Buffer — funciona con foto de perfil y banner
-                thumbnail: ppBuffer,
-                sourceUrl: global.rcanal || '',
-                mediaType: 1,
-                renderLargerThumbnail: true
-              }
-            }
-          })
-
-        } else if (anu.action === 'remove') {
-          const txt = [
-            `🍂 @${num.split('@')[0]} ha salido de *${metadata.subject}*.`,
-            ``,
-            `Fue bonito tenerte aquí mientras duró... 🌙`,
-            `Cuídate mucho donde vayas. Quizás nos volvamos a ver. 💫`
-          ].join('\n')
-
-          await conn.sendMessage(anu.id, {
-            text: txt,
-            contextInfo: {
-              mentionedJid: [num],
-              externalAdReply: {
-                title: '🍂 Hasta pronto...',
-                body: `Se fue de ${metadata.subject}`,
-                thumbnail: ppBuffer,
-                sourceUrl: global.rcanal || '',
-                mediaType: 1,
-                renderLargerThumbnail: true
-              }
-            }
-          })
+      for (const [, plugin] of plugins) {
+        if (typeof plugin?.participantsUpdate === 'function') {
+          try {
+            await plugin.participantsUpdate(conn, anu, database.data)
+          } catch (e) {
+            console.error('[PARTICIPANTS PLUGIN ERROR]', e.message)
+          }
         }
       }
     } catch (err) {
