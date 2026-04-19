@@ -10,7 +10,6 @@ export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
   run: async (client, m, args, usedPrefix, command) => {
-    // Definimos la conexión detectando si es client o m.conn
     const conn = client?.sendMessage ? client : (m.conn || client)
 
     try {
@@ -31,14 +30,19 @@ export default {
       const pack   = marca[0] || PACK_NAME
       const author = marca.length > 1 ? marca[1] : PACK_AUTHOR
 
-      const thumb       = await global.getBannerThumb()
-      const contextInfo = global.getNewsletterCtx(
-        thumb,
-        `🦋 ${global.botName || 'Nino Bot'}`,
-        'Sticker Maker PREMIUM'
-      )
+      // ─── CONTEXTO SEGURO (SIN JIDDECODE ERROR) ───────────────────────────
+      const contextInfo = {
+        externalAdReply: {
+          title: `🦋 ${global.botName || 'Nino Bot'}`,
+          body: 'Sticker Maker PREMIUM',
+          mediaType: 1,
+          previewType: 0,
+          renderLargerThumbnail: false,
+          thumbnailUrl: 'https://qu.ax/ZviU.jpg', // URL de repuesto o usa global.banner
+          sourceUrl: 'https://github.com'
+        }
+      }
 
-      // Reacción usando la conexión validada
       if (conn?.sendMessage) {
         await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
       }
@@ -102,7 +106,7 @@ export default {
       if (conn?.sendMessage) {
         await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
       }
-      conn.reply(m.chat, '🦋 Error: Intenta con algo más ligero.', m)
+      conn.reply(m.chat, '🦋 Error: FFmpeg o la media falló.', m)
     }
   }
 }
@@ -144,4 +148,4 @@ const buildFFmpegFilters = (args) => {
 
     filters.push('format=yuva420p') 
     return filters.join(',')
-      }
+  }
