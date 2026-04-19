@@ -12,24 +12,109 @@ export default {
   category: 'stickers',
   run: async (client, m, args, usedPrefix, command) => {
     try {
-      // TEST: verificar que el handler se ejecuta
-      return client.reply(
-        m.chat,
-        `🦋 Handler Nino activo.\n\nArgs: ${args.join(' ') || '(sin args)'}\nComando: ${usedPrefix + command}`,
-        m
+      // ─── MENÚ DE AYUDA (-list) ──────────────────────────────────────────────
+      if (args[0] === '-list') {
+        const helpText =
+          `🦋 *NINO NAKANO PREMIUM* 🦋\n\n` +
+          `✦ *Formas:*\n- -c (Círculo), -t (Triángulo), -s (Estrella), -r (Redondeado), -v (Corazón), -d (Diamante)\n\n` +
+          `✧ *Efectos:*\n- -blur, -sepia, -invert, -grayscale, -flip, -flop, -tint\n\n` +
+          `> *Ejemplo:* ${usedPrefix + command} -c -blur Nino | 𝓐𝓪𝓻om`
+        return client.reply(m.chat, helpText, m)
+      }
+
+      const quoted = m.quoted ? m.quoted : m
+      const mime   = (quoted.msg || quoted).mimetype || ''
+
+      // Manejo de Texto / Pack / Autor
+      const filteredText = args.join(' ').replace(/-\w+/g, '').trim()
+      const marca  = filteredText.split(/[\u2022|]/).map(part => part.trim())
+      const pack   = marca[0] || PACK_NAME
+      const author = marca.length > 1 ? marca[1] : PACK_AUTHOR
+
+      // ─── CONTEXTO NEWSLETTER ───────────────────────────────────────────────
+      const thumb       = await global.getBannerThumb()
+      const contextInfo = global.getNewsletterCtx(
+        thumb,
+        `🦋 ${global.botName || 'Nino Bot'}`,
+        'Sticker Maker PREMIUM'
       )
+
+      // ─── VALIDAR MEDIA ────────────────────────────────────────────────────
+      if (!/image|video|webp/.test(mime)) {
+        return client.reply(
+          m.chat,
+          `🦋 *NINO NAKANO PREMIUM*\n\n` +
+          `Responde a una imagen o video para crear un sticker.\n` +
+          `> Usa *${usedPrefix + command} -list* para ver efectos.`,
+          m
+        )
+      }
+
+      const buffer  = await quoted.download()
+      const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
+
+      if (isVideo && (quoted.msg || quoted).seconds > 10) {
+        return client.reply(
+          m.chat,
+          '🦋 *Error:* El video no puede durar más de 10 segundos.',
+          m
+        )
+      }
+
+      const inputPath  = path.join(tmpdir(), `nino_in_${Date.now()}`)
+      const outputPath = path.join(tmpdir(), `nino_out_${Date.now()}.webp`)
+      fs.writeFileSync(inputPath, buffer)
+
+      // ─── FFmpeg ANTIFANTASMA ──────────────────────────────────────────────
+      const vf = buildFFmpegFilters(args)
+      const ffmpegArgs = [
+        '-y', '-i', inputPath,
+        '-vf', vf,
+        '-vcodec', 'libwebp',
+        '-lossless', '0',
+        '-compression_level', '6',
+        '-q:v', isVideo ? '30' : '50',
+        '-loop', '0',
+        '-preset', 'picture',
+        '-an', '-vsync', '0',
+        outputPath
+      ]
+
+      await new Promise((resolve, reject) => {
+        const p = spawn('ffmpeg', ffmpegArgs)
+        p.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg falló con código ' + code)))
+      })
+
+      const stickerBuffer = fs.readFileSync(outputPath)
+      const finalSticker  = await addExif(stickerBuffer, pack, author)
+
+      // ─── ENVÍO DEL STICKER (FIX: evitar link preview) ─────────────────────
+      await client.sendMessage(
+        m.chat,
+        {
+          sticker: finalSticker,
+          contextInfo,
+          linkPreview: false
+        },
+        { quoted: m }
+      )
+
+      // Limpieza de temporales
+      fs.unlinkSync(inputPath)
+      fs.unlinkSync(outputPath)
+
     } catch (e) {
-      console.error('[STICKER TEST ERROR]', e.message)
+      console.error('[STICKER ERROR]', e.message)
       client.reply(
         m.chat,
-        '🦋 *Error en handler de prueba.*',
+        '🦋 *Error:* Intenta con una imagen más pequeña o un video más corto.',
         m
       )
     }
   }
 }
 
-// ─── FUNCno usadas en la prueba, pero las dejo igual) ────────
+// ─── FUNCIONES TÉCNICAS ───────────────────────────────────────────────────────
 
 async function addExif(buffer, pack, auth) {
     const json = {
@@ -66,6 +151,6 @@ const buildFFmpegFilters = (args) => {
         if (arg === '-v') filters.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(pow((X-256)/160,2)+pow((Y-256)/160,2)-1,3)-pow((X-256)/160,2)*pow((Y-256)/160,3),0),255,0)'`)
     })
 
-    filters.push('format=yuva420p')
+    filters.push('format=yuva420p') // CRÍTICO: evita sticker fantasma
     return filters.join(',')
-  }
+    }
