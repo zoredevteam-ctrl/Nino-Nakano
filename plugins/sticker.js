@@ -39,8 +39,6 @@ export default {
         'Sticker Maker PREMIUM'
       )
 
-      if (typeof m.react === 'function') await m.react('⏳')
-
       // ─── VALIDAR MEDIA ────────────────────────────────────────────────────
       if (!/image|video|webp/.test(mime)) {
         return client.reply(
@@ -90,20 +88,15 @@ export default {
       const stickerBuffer = fs.readFileSync(outputPath)
       const finalSticker  = await addExif(stickerBuffer, pack, author)
 
-      await client.sendMessage(m.chat, {
-        sticker: finalSticker,
-        contextInfo
-      }, { quoted: m })
-
-      if (typeof m.react === 'function') await m.react('✅')
-
-      // Limpieza de temporales
-      fs.unlinkSync(inputPath)
-      fs.unlinkSync(outputPath)
+      // ENVÍO DEL STICKER (tu base sí soporta esto)
+      await client.sendMessage(
+        m.chat,
+        { sticker: finalSticker, contextInfo },
+        { quoted: m }
+      )
 
     } catch (e) {
       console.error('[STICKER ERROR]', e.message)
-      if (typeof m.react === 'function') await m.react('❌')
       client.reply(
         m.chat,
         '🦋 *Error:* Intenta con una imagen más pequeña o un video más corto.',
@@ -152,4 +145,4 @@ const buildFFmpegFilters = (args) => {
 
     filters.push('format=yuva420p') // CRÍTICO: evita sticker fantasma
     return filters.join(',')
-    }
+        }
