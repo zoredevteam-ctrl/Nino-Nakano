@@ -30,7 +30,6 @@ export default {
       const pack   = marca[0] || PACK_NAME
       const author = marca.length > 1 ? marca[1] : PACK_AUTHOR
 
-      // ─── CONTEXTO SEGURO (SIN JIDDECODE ERROR) ───────────────────────────
       const contextInfo = {
         externalAdReply: {
           title: `🦋 ${global.botName || 'Nino Bot'}`,
@@ -38,7 +37,7 @@ export default {
           mediaType: 1,
           previewType: 0,
           renderLargerThumbnail: false,
-          thumbnailUrl: 'https://qu.ax/ZviU.jpg', // URL de repuesto o usa global.banner
+          thumbnailUrl: 'https://qu.ax/ZviU.jpg',
           sourceUrl: 'https://github.com'
         }
       }
@@ -50,8 +49,8 @@ export default {
       if (!/image|video|webp/.test(mime)) {
         return conn.reply(m.chat,
           `🦋 NINO NAKANO PREMIUM\n\n` +
-          `Responde a una imagen o video para crear un sticker.\n` +
-          `> Usa ${usedPrefix + command} -list para ver efectos.`,
+          `Responde a una image o video.\n` +
+          `> Usa ${usedPrefix + command} -list`,
           m
         )
       }
@@ -60,7 +59,7 @@ export default {
       const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
 
       if (isVideo && (quoted.msg || quoted).seconds > 10) {
-        return conn.reply(m.chat, '🦋 Error: El video no puede durar más de 10 segundos.', m)
+        return conn.reply(m.chat, '🦋 Error: Video máximo 10 seg.', m)
       }
 
       const inputPath  = path.join(tmpdir(), `ninoin${Date.now()}`)
@@ -83,7 +82,7 @@ export default {
 
       await new Promise((resolve, reject) => {
         const p = spawn('ffmpeg', ffmpegArgs)
-        p.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg falló con código ' + code)))
+        p.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg error ' + code)))
       })
 
       const stickerBuffer = fs.readFileSync(outputPath)
@@ -102,19 +101,19 @@ export default {
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
 
     } catch (e) {
-      console.error('[STICKER ERROR]', e.message)
+      console.error(e)
       if (conn?.sendMessage) {
         await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
       }
-      conn.reply(m.chat, '🦋 Error: FFmpeg o la media falló.', m)
+      conn.reply(m.chat, '🦋 Error de procesamiento.', m)
     }
   }
 }
 
 async function addExif(buffer, pack, auth) {
     const json = {
-        'sticker-pack-id':        `nino-${Date.now()}`,
-        'sticker-pack-name':      pack,
+        'sticker-pack-id': `nino-${Date.now()}`,
+        'sticker-pack-name': pack,
         'sticker-pack-publisher': auth,
         'emojis': ['🦋']
     }
@@ -134,18 +133,15 @@ const buildFFmpegFilters = (args) => {
         '-flip':      'hflip',
         '-flop':      'vflip'
     }
-
     const filters = [
         'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000',
         'format=rgba'
     ]
-
     args.forEach(arg => {
         if (effectArgs[arg]) filters.push(effectArgs[arg])
         if (arg === '-c') filters.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte((X-256)*(X-256)+(Y-256)*(Y-256),256*256),255,0)'`)
         if (arg === '-v') filters.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(pow((X-256)/160,2)+pow((Y-256)/160,2)-1,3)-pow((X-256)/160,2)*pow((Y-256)/160,3),0),255,0)'`)
     })
-
     filters.push('format=yuva420p') 
     return filters.join(',')
-  }
+        }
