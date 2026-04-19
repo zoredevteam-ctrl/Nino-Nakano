@@ -2,14 +2,11 @@
  * NSFW COMPLETO - NINO NAKANO (TODO EN UN SOLO ARCHIVO)
  * #nsfw on/off — activar/desactivar
  * #tetas #pussy #caliente y todos los demás
- * Adaptado exactamente con lo que me mandaste 🔥
+ * ¡Ahora #tetas y #pussy usan la misma API estable de nekobot! 🔥
  */
 
 import { database } from '../lib/database.js'
-import fetch from 'node-fetch'   // ← Necesario para tu API de #pussy
-
-const CATEGORIAS_NSFW = ['neko', 'waifu', 'blowjob', 'anal', 'pussy', 'hentai', 'lewdkitsune', 'futa', 'oral', 'paizuri']
-const CATEGORIAS_SFW  = ['neko', 'waifu', 'shinobu', 'megumin', 'cuddle', 'hug', 'pat', 'kiss', 'feed', 'wave']
+import fetch from 'node-fetch'
 
 const getBannerBuffer = async () => {
     try {
@@ -86,7 +83,7 @@ let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) 
         )
     }
 
-    // ── Chequeo NSFW para todos los comandos adultos ─────────────────
+    // ── Chequeo NSFW ─────────────────────────────────────────────────
     const comandosNSFW = ['hentai', 'lewdkitsune', 'futa', 'oral', 'paizuri', 'blowjob', 'anal', 'pussy', 'waifu18', 'nsfwneko', 'tetas', 'caliente']
     const esNsfw = comandosNSFW.includes(cmd)
 
@@ -104,19 +101,20 @@ let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) 
         let imgUrl = null
         let caption = `*\( {cmd.toUpperCase()}* 🔥\n> _ \){global.botName || 'Nino Nakano'}_`
 
-        // TUS COMANDOS EXACTOS
+        // TUS COMANDOS CON API ESTABLE (nekobot)
         if (cmd === 'tetas') {
-            imgUrl = 'https://api.delirius.store/nsfw/boobs'
+            const res = await fetch('https://nekobot.xyz/api/image?type=boobs')
+            const json = await res.json()
+            if (!json.success) throw new Error('Error nekobot tetas')
+            imgUrl = json.message
         } 
         else if (cmd === 'pussy') {
-            // ← Tu código exacto de nekobot que me mandaste
             const res = await fetch('https://nekobot.xyz/api/image?type=pussy')
             const json = await res.json()
-            if (!json.success) throw new Error('Error nekobot')
+            if (!json.success) throw new Error('Error nekobot pussy')
             imgUrl = json.message
         } 
         else if (cmd === 'caliente') {
-            // Imagen NSFW estable + texto erótico
             const categorias = ['waifu', 'neko', 'blowjob', 'trap']
             const cat = categorias[Math.floor(Math.random() * categorias.length)]
             imgUrl = await getWaifuPics(cat, true)
