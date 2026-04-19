@@ -78,19 +78,18 @@ export default {
       const stickerBuffer = fs.readFileSync(outputPath)
       const finalSticker = await addExif(stickerBuffer, pack, author)
 
+      // Se eliminó 'text' y 'linkPreview' para evitar el TypeError en extractUrlFromText
       await client.sendMessage(
         m.chat,
         {
           sticker: finalSticker,
-          contextInfo,
-          text: '',
-          linkPreview: false
+          contextInfo
         },
         { quoted: m }
       )
 
-      fs.unlinkSync(inputPath)
-      fs.unlinkSync(outputPath)
+      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath)
+      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
 
     } catch (e) {
       console.error('[STICKER ERROR]', e.message)
@@ -136,4 +135,4 @@ const buildFFmpegFilters = (args) => {
 
   filters.push('format=yuva420p')
   return filters.join(',')
-}
+    }
