@@ -1,8 +1,8 @@
 /**
- * NSFW TEXT + IMAGEN - NINO NAKANO
+ * NSFW TEXT + IMAGEN - NINO NAKANO (VERSIÓN CORREGIDA)
  * Comando: #caliente | #erotica | #nsfwtext
- * Solo funciona si el grupo tiene #nsfw on (usa exactamente el mismo sistema que nsfw.js)
- * Z0RT SYSTEMS 🔥
+ * Solo funciona si el grupo tiene #nsfw on
+ * Z0RT SYSTEMS 🔥 - Corregido 18/04/2026
  */
 
 import { database } from '../lib/database.js'
@@ -39,7 +39,7 @@ const getWaifuPics = async (categoria = 'waifu', nsfw = true) => {
     return json?.url || null
 }
 
-// Textos eróticos bien calientes (puedes agregar más)
+// Textos eróticos bien calientes y largos
 const textosEroticos = [
     "Te tengo contra la pared, mi mano bajando despacio por tu cuerpo mientras te muerdo el cuello… siento cómo tiemblas cuando mis dedos llegan a tu cintura y te aprieto contra mí. ¿Quieres que siga más abajo, papi?",
     "Estoy de rodillas frente a ti, mirándote a los ojos mientras te la chupo lento y profundo… mi lengua jugando con la punta, tragándomela toda mientras gimes mi nombre. ¿Más rápido o quieres que te haga sufrir un rato?",
@@ -51,14 +51,14 @@ const textosEroticos = [
     "Te acabo de poner en cuatro y te estoy dando duro… cada nalgada resuena mientras te corres sin control."
 ]
 
-let handler = async (m, { conn, command, isAdmin, isOwner, isGroup, db }) => {
+let handler = async (m, { conn, command, isGroup, db }) => {
     if (!isGroup) return sendNino(conn, m, `❌ Este comando solo funciona en grupos.`)
 
     if (!db.groups) db.groups = {}
     if (!db.groups[m.chat]) db.groups[m.chat] = {}
     const grupo = db.groups[m.chat]
 
-    // Chequeo exacto del NSFW (igual que en nsfw.js)
+    // Chequeo exacto del NSFW (igual que nsfw.js)
     if (!grupo.nsfw) {
         return sendNino(conn, m,
             `*CONTENIDO ADULTO DESACTIVADO*\n\n` +
@@ -70,15 +70,14 @@ let handler = async (m, { conn, command, isAdmin, isOwner, isGroup, db }) => {
     await m.react('🔥')
 
     try {
-        // Imagen NSFW random (mismo estilo que nsfw.js)
-        const categoriasNsfw = ['hentai', 'blowjob', 'anal', 'pussy', 'waifu', 'neko']
+        // ✅ Solo categorías que SÍ funcionan en la API
+        const categoriasNsfw = ['waifu', 'neko', 'blowjob', 'trap']
         const cat = categoriasNsfw[Math.floor(Math.random() * categoriasNsfw.length)]
+        
         const imgUrl = await getWaifuPics(cat, true)
-
         const imgRes = await fetch(imgUrl)
         const buffer = Buffer.from(await imgRes.arrayBuffer())
 
-        // Texto erótico random
         const texto = textosEroticos[Math.floor(Math.random() * textosEroticos.length)]
 
         await m.react('✅')
