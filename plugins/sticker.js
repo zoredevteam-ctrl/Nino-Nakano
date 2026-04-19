@@ -39,7 +39,7 @@ export default {
         'Sticker Maker PREMIUM'
       )
 
-      await m.react('⏳')
+      await client.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
 
       // ─── VALIDAR MEDIA ────────────────────────────────────────────────────
       if (!/image|video|webp/.test(mime)) {
@@ -90,7 +90,7 @@ export default {
         contextInfo
       }, { quoted: m })
 
-      await m.react('✅')
+      await client.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
 
       // Limpieza de temporales
       fs.unlinkSync(inputPath)
@@ -98,7 +98,7 @@ export default {
 
     } catch (e) {
       console.error('[STICKER ERROR]', e.message)
-      await m.react('❌')
+      await client.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
       m.reply('🦋 *Error:* Intenta con una imagen más pequeña o un video más corto.')
     }
   }
@@ -143,4 +143,4 @@ const buildFFmpegFilters = (args) => {
 
     filters.push('format=yuva420p') // CRÍTICO: evita sticker fantasma
     return filters.join(',')
-}
+                                        }
