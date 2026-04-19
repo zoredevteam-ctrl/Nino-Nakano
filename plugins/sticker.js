@@ -43,7 +43,8 @@ export default {
 
       // ─── VALIDAR MEDIA ────────────────────────────────────────────────────
       if (!/image|video|webp/.test(mime)) {
-        return client.reply(m.chat,
+        return client.reply(
+          m.chat,
           `🦋 *NINO NAKANO PREMIUM*\n\n` +
           `Responde a una imagen o video para crear un sticker.\n` +
           `> Usa *${usedPrefix + command} -list* para ver efectos.`,
@@ -55,7 +56,11 @@ export default {
       const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
 
       if (isVideo && (quoted.msg || quoted).seconds > 10) {
-        return m.reply('🦋 *Error:* El video no puede durar más de 10 segundos.')
+        return client.reply(
+          m.chat,
+          '🦋 *Error:* El video no puede durar más de 10 segundos.',
+          m
+        )
       }
 
       const inputPath  = path.join(tmpdir(), `nino_in_${Date.now()}`)
@@ -99,7 +104,11 @@ export default {
     } catch (e) {
       console.error('[STICKER ERROR]', e.message)
       if (typeof m.react === 'function') await m.react('❌')
-      m.reply('🦋 *Error:* Intenta con una imagen más pequeña o un video más corto.')
+      client.reply(
+        m.chat,
+        '🦋 *Error:* Intenta con una imagen más pequeña o un video más corto.',
+        m
+      )
     }
   }
 }
@@ -143,4 +152,4 @@ const buildFFmpegFilters = (args) => {
 
     filters.push('format=yuva420p') // CRÍTICO: evita sticker fantasma
     return filters.join(',')
-        }
+    }
