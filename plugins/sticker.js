@@ -9,7 +9,10 @@ const PACK_AUTHOR = '𝓐𝓪𝓻𝓸𝓶'
 export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
-  run: async (conn, m, args, usedPrefix, command) => {
+  run: async (conn, m, { args, usedPrefix, command }) => { // Ajuste de parámetros según cargadores comunes
+    // Definimos la conexión de forma segura
+    const _conn = m.conn || conn || m.client
+
     try {
       if (args[0] === '-list') {
         const helpText =
@@ -17,7 +20,7 @@ export default {
           `✦ Formas:\n- -c (Círculo), -t (Triángulo), -s (Estrella), -r (Redondeado), -v (Corazón), -d (Diamante)\n\n` +
           `✧ Efectos:\n- -blur, -sepia, -invert, -grayscale, -flip, -flop, -tint\n\n` +
           `> Ejemplo: ${usedPrefix + command} -c -blur Nino | 𝓐𝓪𝓻om`
-        return conn.reply(m.chat, helpText, m)
+        return _conn.reply(m.chat, helpText, m)
       }
 
       const quoted = m.quoted ? m.quoted : m
@@ -35,11 +38,11 @@ export default {
         'Sticker Maker PREMIUM'
       )
 
-      // Usando conn.sendMessage para la reacción
-      await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
+      // Reacción usando la conexión detectada
+      await _conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
 
       if (!/image|video|webp/.test(mime)) {
-        return conn.reply(m.chat,
+        return _conn.reply(m.chat,
           `🦋 NINO NAKANO PREMIUM\n\n` +
           `Responde a una imagen o video para crear un sticker.\n` +
           `> Usa ${usedPrefix + command} -list para ver efectos.`,
@@ -51,7 +54,7 @@ export default {
       const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
 
       if (isVideo && (quoted.msg || quoted).seconds > 10) {
-        return conn.reply(m.chat, '🦋 Error: El video no puede durar más de 10 segundos.', m)
+        return _conn.reply(m.chat, '🦋 Error: El video no puede durar más de 10 segundos.', m)
       }
 
       const inputPath  = path.join(tmpdir(), `ninoin${Date.now()}`)
@@ -80,20 +83,22 @@ export default {
       const stickerBuffer = fs.readFileSync(outputPath)
       const finalSticker  = await addExif(stickerBuffer, pack, author)
 
-      await conn.sendMessage(m.chat, {
+      await _conn.sendMessage(m.chat, {
         sticker: finalSticker,
         contextInfo
       }, { quoted: m })
 
-      await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
+      await _conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
 
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath)
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
 
     } catch (e) {
       console.error('[STICKER ERROR]', e.message)
-      await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
-      conn.reply(m.chat, '🦋 Error: Intenta con una imagen más pequeña o un video más corto.', m)
+      try {
+          await _conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
+      } catch (e2) {}
+      _conn.reply(m.chat, '🦋 Error: Intenta de nuevo con algo más ligero.', m)
     }
   }
 }
@@ -135,4 +140,4 @@ const buildFFmpegFilters = (args) => {
 
     filters.push('format=yuva420p') 
     return filters.join(',')
-        }
+      }
