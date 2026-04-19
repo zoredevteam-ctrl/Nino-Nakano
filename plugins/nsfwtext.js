@@ -1,11 +1,12 @@
 /**
- * NSFW - NINO NAKANO (VERSIÓN ACTUALIZADA CON TUS COMANDOS)
+ * NSFW COMPLETO - NINO NAKANO (TODO EN UN SOLO ARCHIVO)
  * #nsfw on/off — activar/desactivar
- * #tetas #pussy y todos los demás
- * Adaptado por Z0RT SYSTEMS 🔥
+ * #tetas #pussy #caliente y todos los demás
+ * Adaptado exactamente con lo que me mandaste 🔥
  */
 
 import { database } from '../lib/database.js'
+import fetch from 'node-fetch'   // ← Necesario para tu API de #pussy
 
 const CATEGORIAS_NSFW = ['neko', 'waifu', 'blowjob', 'anal', 'pussy', 'hentai', 'lewdkitsune', 'futa', 'oral', 'paizuri']
 const CATEGORIAS_SFW  = ['neko', 'waifu', 'shinobu', 'megumin', 'cuddle', 'hug', 'pat', 'kiss', 'feed', 'wave']
@@ -42,6 +43,18 @@ const getWaifuPics = async (categoria, nsfw = false) => {
     return json?.url || null
 }
 
+// Textos eróticos para #caliente
+const textosEroticos = [
+    "Te tengo contra la pared, mi mano bajando despacio por tu cuerpo mientras te muerdo el cuello… siento cómo tiemblas cuando mis dedos llegan a tu cintura y te aprieto contra mí. ¿Quieres que siga más abajo, papi?",
+    "Estoy de rodillas frente a ti, mirándote a los ojos mientras te la chupo lento y profundo… mi lengua jugando con la punta, tragándomela toda mientras gimes mi nombre. ¿Más rápido o quieres que te haga sufrir un rato?",
+    "Te acabo de sentar en mi cara y no pienso levantarme hasta que me mojes toda la boca… muevo la lengua rápido y fuerte mientras te agarras de mi pelo y te corres en mi cara.",
+    "Te estoy follando por detrás, jalándote el pelo fuerte mientras te susurro al oído lo puta que eres para mí… cada embestida más dura, sintiendo cómo aprietas alrededor de mí.",
+    "Estoy encima de ti, moviéndome lento y profundo, mirándote a los ojos mientras te digo lo rica que te sientes… quiero que te corras gritando mi nombre.",
+    "Te tengo atada a la cama, con las piernas abiertas… te como entera mientras te retuerces y me suplicas que te folle ya.",
+    "Mi mano en tu garganta mientras te follo fuerte… siento cómo palpitas alrededor de mí, a punto de explotar.",
+    "Te acabo de poner en cuatro y te estoy dando duro… cada nalgada resuena mientras te corres sin control."
+]
+
 let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) => {
     const cmd = command.toLowerCase()
 
@@ -73,14 +86,15 @@ let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) 
         )
     }
 
-    // ── Comandos NSFW ─────────────────────────────────────────────────
-    const esNsfw = ['hentai', 'lewdkitsune', 'futa', 'oral', 'paizuri', 'blowjob', 'anal', 'pussy', 'waifu18', 'nsfwneko', 'tetas'].includes(cmd)
+    // ── Chequeo NSFW para todos los comandos adultos ─────────────────
+    const comandosNSFW = ['hentai', 'lewdkitsune', 'futa', 'oral', 'paizuri', 'blowjob', 'anal', 'pussy', 'waifu18', 'nsfwneko', 'tetas', 'caliente']
+    const esNsfw = comandosNSFW.includes(cmd)
 
     if (esNsfw && !grupo.nsfw) {
         return sendNino(conn, m,
             `*CONTENIDO ADULTO DESACTIVADO*\n\n` +
             `El modo NSFW no está activado en este grupo.\n` +
-            `Un admin debe usar *#nsfw on* para activarlo.`
+            `Un admin debe usar *#nsfw on* para poder usar este comando.`
         )
     }
 
@@ -88,20 +102,28 @@ let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) 
 
     try {
         let imgUrl = null
+        let caption = `*\( {cmd.toUpperCase()}* 🔥\n> _ \){global.botName || 'Nino Nakano'}_`
 
-        // TUS COMANDOS ADAPTADOS
+        // TUS COMANDOS EXACTOS
         if (cmd === 'tetas') {
             imgUrl = 'https://api.delirius.store/nsfw/boobs'
         } 
         else if (cmd === 'pussy') {
-            // Tu API de nekobot
+            // ← Tu código exacto de nekobot que me mandaste
             const res = await fetch('https://nekobot.xyz/api/image?type=pussy')
             const json = await res.json()
             if (!json.success) throw new Error('Error nekobot')
             imgUrl = json.message
         } 
-        // Resto de comandos NSFW (waifu.pics)
+        else if (cmd === 'caliente') {
+            // Imagen NSFW estable + texto erótico
+            const categorias = ['waifu', 'neko', 'blowjob', 'trap']
+            const cat = categorias[Math.floor(Math.random() * categorias.length)]
+            imgUrl = await getWaifuPics(cat, true)
+            caption = `🔥 *CALIENTE* 🔥\n\n\( {textosEroticos[Math.floor(Math.random() * textosEroticos.length)]}\n\n> _ \){global.botName || 'Nino Nakano'}_`
+        } 
         else if (esNsfw) {
+            // Resto de comandos waifu.pics
             const catMap = {
                 'hentai': 'hentai', 'waifu18': 'waifu', 'nsfwneko': 'neko',
                 'blowjob': 'blowjob', 'oral': 'oral', 'paizuri': 'paizuri',
@@ -122,22 +144,22 @@ let handler = async (m, { conn, command, text, isAdmin, isOwner, isGroup, db }) 
 
         await conn.sendMessage(m.chat, {
             image: buffer,
-            caption: `*\( {cmd.toUpperCase()}* 🔥\n> _ \){global.botName || 'Nino Nakano'}_`
+            caption: caption
         }, { quoted: m })
 
     } catch (e) {
         console.error('[NSFW ERROR]', e)
         await m.react('❌')
-        return m.reply(`❌ No pude cargar la imagen. Intenta de nuevo.`)
+        return m.reply(`❌ No pude cargar el contenido. Intenta de nuevo.`)
     }
 }
 
 handler.command = [
     'nsfw',
-    // SFW (se mantienen)
+    // SFW
     'neko', 'nekosfw', 'pat', 'feed', 'wave',
-    // NSFW (incluyendo los tuyos)
-    'hentai', 'waifu18', 'nsfwneko', 'blowjob', 'oral', 'paizuri', 'futa', 'lewdkitsune', 'anal', 'pussy', 'tetas'
+    // NSFW (incluyendo los tuyos + caliente)
+    'hentai', 'waifu18', 'nsfwneko', 'blowjob', 'oral', 'paizuri', 'futa', 'lewdkitsune', 'anal', 'pussy', 'tetas', 'caliente'
 ]
 handler.group = true
 export default handler
