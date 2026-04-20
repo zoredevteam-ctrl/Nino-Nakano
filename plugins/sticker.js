@@ -15,39 +15,50 @@ export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
   run: async (m, { args, usedPrefix, command }) => {
+    const debug = async (txt) => {
+      try { await m.reply('🐞 ' + txt) } catch {}
+    }
+
     try {
+      await debug('Inicio comando')
+
       if (args[0] === '-list') {
-        const helpText =
+        return m.reply(
           `🦋 NINO NAKANO PREMIUM 🦋\n\n` +
           `✦ Uso:\n- Responde a imagen o video\n\n` +
           `> Ejemplo: ${usedPrefix + command}`
-        return m.reply(helpText)
+        )
       }
 
-      if (!m.chat || typeof m.chat !== 'string') return
+      if (!m.chat || typeof m.chat !== 'string') {
+        await debug('Chat inválido')
+        return
+      }
 
       const quoted = m.quoted ? m.quoted : m
       const mime = (quoted.msg || quoted).mimetype || ''
+
+      await debug('Mime: ' + mime)
+
+      if (!/image|video|webp/.test(mime)) {
+        await debug('Mime no válido')
+        return m.reply(`Responde a imagen o video`)
+      }
+
+      const buffer = await quoted.download()
+      await debug('Media descargada: ' + buffer.length + ' bytes')
+
+      const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
+
+      if (isVideo && (quoted.msg || quoted).seconds > 10) {
+        await debug('Video muy largo')
+        return m.reply('Máximo 10 segundos')
+      }
 
       const filteredText = args.join(' ').trim()
       const marca = filteredText.split(/[•|]/).map(v => v.trim())
       const pack = marca[0] || PACK_NAME
       const author = marca[1] || PACK_AUTHOR
-
-      await m.react('⏳')
-
-      if (!/image|video|webp/.test(mime)) {
-        return m.reply(
-          `🦋 NINO NAKANO PREMIUM\n\nResponde a una imagen o video.`
-        )
-      }
-
-      const buffer = await quoted.download()
-      const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
-
-      if (isVideo && (quoted.msg || quoted).seconds > 10) {
-        return m.reply('🦋 Error: Video máximo 10 seg.')
-      }
 
       const metadata = {
         packname: pack,
@@ -55,13 +66,19 @@ export default {
         categories: ['🦋']
       }
 
+      await debug('Procesando a webp...')
+
       let stickerPath
 
       if (isVideo) {
-        stickerPath = await writeExifVid(buffer, metadata)
+        await debug('Modo video')
+        stickerPath = await writeExifVid(buffer, metadata, debug)
       } else {
-        stickerPath = await writeExifImg(buffer, metadata)
+        await debug('Modo imagen')
+        stickerPath = await writeExifImg(buffer, metadata, debug)
       }
+
+      await debug('Leyendo resultado')
 
       const finalSticker = fs.readFileSync(stickerPath)
 
@@ -71,14 +88,14 @@ export default {
         author: author
       })
 
-      await m.react('✅')
+      await debug('Sticker enviado')
 
       if (fs.existsSync(stickerPath)) fs.unlinkSync(stickerPath)
 
     } catch (e) {
       console.error(e)
-      await m.react('❌')
-      m.reply('🦋 Error de procesamiento.')
+      const msg = e?.stack?.slice(0, 400) || e.toString()
+      await m.reply('💥 ERROR:\n' + msg)
     }
   }
 }
@@ -92,7 +109,7 @@ function bufferToStream(buffer) {
   })
 }
 
-async function imageToWebp(buffer) {
+async function imageToWebp(buffer, debug) {
   return new Promise((resolve, reject) => {
     const chunks = []
 
@@ -103,14 +120,20 @@ async function imageToWebp(buffer) {
         "-vf", "scale=320:320:force_original_aspect_ratio=increase,crop=320:320,fps=15,format=rgba"
       ])
       .format('webp')
-      .on('error', reject)
-      .on('end', () => resolve(Buffer.concat(chunks)))
+      .on('error', async (err) => {
+        await debug('Error ffmpeg img: ' + err.message)
+        reject(err)
+      })
+      .on('end', async () => {
+        await debug('ffmpeg img OK')
+        resolve(Buffer.concat(chunks))
+      })
       .pipe()
       .on('data', c => chunks.push(c))
   })
 }
 
-async function videoToWebp(buffer) {
+async function videoToWebp(buffer, debug) {
   return new Promise((resolve, reject) => {
     const chunks = []
 
@@ -127,24 +150,32 @@ async function videoToWebp(buffer) {
         "-vsync", "0"
       ])
       .format('webp')
-      .on('error', reject)
-      .on('end', () => resolve(Buffer.concat(chunks)))
+      .on('error', async (err) => {
+        await debug('Error ffmpeg vid: ' + err.message)
+        reject(err)
+      })
+      .on('end', async () => {
+        await debug('ffmpeg vid OK')
+        resolve(Buffer.concat(chunks))
+      })
       .pipe()
       .on('data', c => chunks.push(c))
   })
 }
 
-async function writeExifImg(media, metadata) {
-  const wMedia = await imageToWebp(media)
-  return await addExif(wMedia, metadata)
+async function writeExifImg(media, metadata, debug) {
+  const wMedia = await imageToWebp(media, debug)
+  await debug('Añadiendo EXIF img')
+  return await addExif(wMedia, metadata, debug)
 }
 
-async function writeExifVid(media, metadata) {
-  const wMedia = await videoToWebp(media)
-  return await addExif(wMedia, metadata)
+async function writeExifVid(media, metadata, debug) {
+  const wMedia = await videoToWebp(media, debug)
+  await debug('Añadiendo EXIF vid')
+  return await addExif(wMedia, metadata, debug)
 }
 
-async function addExif(webpBuffer, metadata) {
+async function addExif(webpBuffer, metadata, debug) {
   const tmpIn = path.join(tempFolder, randomFileName("webp"))
   const tmpOut = path.join(tempFolder, randomFileName("webp"))
 
@@ -170,12 +201,17 @@ async function addExif(webpBuffer, metadata) {
   const exif = Buffer.concat([exifAttr, jsonBuff])
   exif.writeUIntLE(jsonBuff.length, 14, 4)
 
-  const img = new webp.Image()
-  await img.load(tmpIn)
-  img.exif = exif
-  await img.save(tmpOut)
+  try {
+    const img = new webp.Image()
+    await img.load(tmpIn)
+    img.exif = exif
+    await img.save(tmpOut)
+    await debug('EXIF aplicado')
+  } catch (e) {
+    await debug('Error EXIF: ' + e.message)
+    throw e
+  }
 
   fs.unlinkSync(tmpIn)
-
   return tmpOut
 }
