@@ -35,8 +35,16 @@ export default {
         return
       }
 
-      const quoted = m.quoted ? m.quoted : m
-      const mime = (quoted.msg || quoted).mimetype || ''
+      const quoted = m.quoted || m
+const msg = quoted.msg || quoted
+
+const mime = msg.mimetype || ''
+const hasMedia = msg.url || msg.directPath
+
+if (!hasMedia) {
+  await debug('Sin mediaKey / media inválida')
+  return m.reply('❌ Ese mensaje no contiene media válida')
+}
 
       await debug('Mime: ' + mime)
 
