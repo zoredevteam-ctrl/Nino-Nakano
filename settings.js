@@ -12,7 +12,7 @@ global.botVersion = '1.0.5'
 
 global.owner = [
     ['573107400303',    'Aarom 🦋',     true],
-    ['5215911153853',    'Angel',     true],
+    ['226044783132714',    'Angel',     true],
     ['573508941325',    'Félix ⚡',     true],
     ['123613520896125', 'Aarom LID 🦋', true]
 ]
