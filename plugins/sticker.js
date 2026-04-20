@@ -90,11 +90,11 @@ if (!hasMedia) {
 
       const finalSticker = fs.readFileSync(stickerPath)
 
-      await m.reply(finalSticker, null, {
-        asSticker: true,
-        packname: pack,
-        author: author
-      })
+      await m.reply({
+  sticker: finalSticker,
+  packname: pack,
+  author: author
+})
 
       await debug('Sticker enviado')
 
