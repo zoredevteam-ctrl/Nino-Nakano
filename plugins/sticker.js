@@ -9,7 +9,7 @@ const PACK_AUTHOR = '𝓐𝓪𝓻𝓸𝓶'
 export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
-  run: async (m, { conn, args, usedPrefix, command }) => {
+  run: async (m, { args, usedPrefix, command }) => {
 
     try {
       if (args[0] === '-list') {
@@ -18,7 +18,7 @@ export default {
           `✦ Formas:\n- -c (Círculo), -t (Triángulo), -s (Estrella), -r (Redondeado), -v (Corazón), -d (Diamante)\n\n` +
           `✧ Efectos:\n- -blur, -sepia, -invert, -grayscale, -flip, -flop, -tint\n\n` +
           `> Ejemplo: ${usedPrefix + command} -c -blur Nino | 𝓐𝓪𝓻om`
-        return conn.reply(m.chat, helpText, m)
+        return m.reply(helpText)
       }
 
       if (!m.chat || typeof m.chat !== 'string') return
@@ -43,14 +43,13 @@ export default {
         }
       }
 
-      await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
+      await m.react('⏳')
 
       if (!/image|video|webp/.test(mime)) {
-        return conn.reply(m.chat,
+        return m.reply(
           `🦋 NINO NAKANO PREMIUM\n\n` +
           `Responde a una image o video.\n` +
-          `> Usa ${usedPrefix + command} -list`,
-          m
+          `> Usa ${usedPrefix + command} -list`
         )
       }
 
@@ -58,7 +57,7 @@ export default {
       const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
 
       if (isVideo && (quoted.msg || quoted).seconds > 10) {
-        return conn.reply(m.chat, '🦋 Error: Video máximo 10 seg.', m)
+        return m.reply('🦋 Error: Video máximo 10 seg.')
       }
 
       const inputPath  = path.join(tmpdir(), `ninoin${Date.now()}`)
@@ -87,22 +86,22 @@ export default {
       const stickerBuffer = fs.readFileSync(outputPath)
       const finalSticker  = await addExif(stickerBuffer, pack, author)
 
-      const safeQuoted = m?.key ? { key: m.key, message: m.message } : undefined
-
-      await conn.sendMessage(m.chat, {
-        sticker: finalSticker,
+      await m.reply(finalSticker, null, {
+        asSticker: true,
+        packname: pack,
+        author: author,
         contextInfo
-      }, safeQuoted ? { quoted: safeQuoted } : {})
+      })
 
-      await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
+      await m.react('✅')
 
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath)
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
 
     } catch (e) {
       console.error(e)
-      await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
-      conn.reply(m.chat, '🦋 Error de procesamiento.', m)
+      await m.react('❌')
+      m.reply('🦋 Error de procesamiento.')
     }
   }
 }
@@ -141,4 +140,4 @@ const buildFFmpegFilters = (args) => {
     })
     filters.push('format=yuva420p') 
     return filters.join(',')
-    }
+                                     }
