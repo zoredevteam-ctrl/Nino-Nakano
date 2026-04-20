@@ -9,8 +9,7 @@ const PACK_AUTHOR = '𝓐𝓪𝓻𝓸𝓶'
 export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
-  run: async (client, m, args, usedPrefix, command) => {
-    const conn = client?.sendMessage ? client : (m.conn || client)
+  run: async (m, { conn, args, usedPrefix, command }) => {
 
     try {
       if (args[0] === '-list') {
@@ -21,6 +20,8 @@ export default {
           `> Ejemplo: ${usedPrefix + command} -c -blur Nino | 𝓐𝓪𝓻om`
         return conn.reply(m.chat, helpText, m)
       }
+
+      if (!m.chat || typeof m.chat !== 'string') return
 
       const quoted = m.quoted ? m.quoted : m
       const mime   = (quoted.msg || quoted).mimetype || ''
@@ -42,9 +43,7 @@ export default {
         }
       }
 
-      if (conn?.sendMessage) {
-        await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
-      }
+      await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } })
 
       if (!/image|video|webp/.test(mime)) {
         return conn.reply(m.chat,
@@ -88,23 +87,21 @@ export default {
       const stickerBuffer = fs.readFileSync(outputPath)
       const finalSticker  = await addExif(stickerBuffer, pack, author)
 
+      const safeQuoted = m?.key ? { key: m.key, message: m.message } : undefined
+
       await conn.sendMessage(m.chat, {
         sticker: finalSticker,
         contextInfo
-      }, { quoted: m })
+      }, safeQuoted ? { quoted: safeQuoted } : {})
 
-      if (conn?.sendMessage) {
-        await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
-      }
+      await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } })
 
       if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath)
       if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
 
     } catch (e) {
       console.error(e)
-      if (conn?.sendMessage) {
-        await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
-      }
+      await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } })
       conn.reply(m.chat, '🦋 Error de procesamiento.', m)
     }
   }
@@ -144,4 +141,4 @@ const buildFFmpegFilters = (args) => {
     })
     filters.push('format=yuva420p') 
     return filters.join(',')
-        }
+    }
