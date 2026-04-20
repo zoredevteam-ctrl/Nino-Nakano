@@ -1,102 +1,79 @@
-import fs from 'fs';
-import path from 'path';
-import { spawn } from 'child_process';
-import { tmpdir } from 'os';
+import fs from 'fs'
+import path from 'path'
+import ffmpeg from 'fluent-ffmpeg'
+import webp from 'node-webpmux'
+import { tmpdir } from 'os'
+import { Readable } from 'stream'
 
-const PACK_NAME   = 'Nino Nakano PREMIUM 🦋'
+const PACK_NAME = 'Nino Nakano PREMIUM 🦋'
 const PACK_AUTHOR = '𝓐𝓪𝓻𝓸𝓶'
+
+const tempFolder = tmpdir()
+const randomFileName = (ext) => `${Date.now()}-${Math.floor(Math.random() * 10000)}.${ext}`
 
 export default {
   command: ['sticker', 's', 'stk'],
   category: 'stickers',
   run: async (m, { args, usedPrefix, command }) => {
-
     try {
       if (args[0] === '-list') {
         const helpText =
           `🦋 NINO NAKANO PREMIUM 🦋\n\n` +
-          `✦ Formas:\n- -c (Círculo), -t (Triángulo), -s (Estrella), -r (Redondeado), -v (Corazón), -d (Diamante)\n\n` +
-          `✧ Efectos:\n- -blur, -sepia, -invert, -grayscale, -flip, -flop, -tint\n\n` +
-          `> Ejemplo: ${usedPrefix + command} -c -blur Nino | 𝓐𝓪𝓻om`
+          `✦ Uso:\n- Responde a imagen o video\n\n` +
+          `> Ejemplo: ${usedPrefix + command}`
         return m.reply(helpText)
       }
 
       if (!m.chat || typeof m.chat !== 'string') return
 
       const quoted = m.quoted ? m.quoted : m
-      const mime   = (quoted.msg || quoted).mimetype || ''
+      const mime = (quoted.msg || quoted).mimetype || ''
 
-      const filteredText = args.join(' ').replace(/-\w+/g, '').trim()
-      const marca  = filteredText.split(/[•|]/).map(part => part.trim())
-      const pack   = marca[0] || PACK_NAME
-      const author = marca.length > 1 ? marca[1] : PACK_AUTHOR
-
-      const contextInfo = {
-        externalAdReply: {
-          title: `🦋 ${global.botName || 'Nino Bot'}`,
-          body: 'Sticker Maker PREMIUM',
-          mediaType: 1,
-          previewType: 0,
-          renderLargerThumbnail: false,
-          thumbnailUrl: 'https://qu.ax/ZviU.jpg',
-          sourceUrl: 'https://github.com'
-        }
-      }
+      const filteredText = args.join(' ').trim()
+      const marca = filteredText.split(/[•|]/).map(v => v.trim())
+      const pack = marca[0] || PACK_NAME
+      const author = marca[1] || PACK_AUTHOR
 
       await m.react('⏳')
 
       if (!/image|video|webp/.test(mime)) {
         return m.reply(
-          `🦋 NINO NAKANO PREMIUM\n\n` +
-          `Responde a una image o video.\n` +
-          `> Usa ${usedPrefix + command} -list`
+          `🦋 NINO NAKANO PREMIUM\n\nResponde a una imagen o video.`
         )
       }
 
-      const buffer  = await quoted.download()
+      const buffer = await quoted.download()
       const isVideo = /video/.test(mime) || (quoted.msg || quoted).gifPlayback
 
       if (isVideo && (quoted.msg || quoted).seconds > 10) {
         return m.reply('🦋 Error: Video máximo 10 seg.')
       }
 
-      const inputPath  = path.join(tmpdir(), `ninoin${Date.now()}`)
-      const outputPath = path.join(tmpdir(), `ninoout${Date.now()}.webp`)
-      fs.writeFileSync(inputPath, buffer)
+      const metadata = {
+        packname: pack,
+        author: author,
+        categories: ['🦋']
+      }
 
-      const vf = buildFFmpegFilters(args)
-      const ffmpegArgs = [
-        '-y', '-i', inputPath,
-        '-vf', vf,
-        '-vcodec', 'libwebp',
-        '-lossless', '0',
-        '-compression_level', '6',
-        '-q:v', isVideo ? '30' : '50',
-        '-loop', '0',
-        '-preset', 'picture',
-        '-an', '-vsync', '0',
-        outputPath
-      ]
+      let stickerPath
 
-      await new Promise((resolve, reject) => {
-        const p = spawn('ffmpeg', ffmpegArgs)
-        p.on('close', (code) => code === 0 ? resolve() : reject(new Error('ffmpeg error ' + code)))
-      })
+      if (isVideo) {
+        stickerPath = await writeExifVid(buffer, metadata)
+      } else {
+        stickerPath = await writeExifImg(buffer, metadata)
+      }
 
-      const stickerBuffer = fs.readFileSync(outputPath)
-      const finalSticker  = await addExif(stickerBuffer, pack, author)
+      const finalSticker = fs.readFileSync(stickerPath)
 
       await m.reply(finalSticker, null, {
         asSticker: true,
         packname: pack,
-        author: author,
-        contextInfo
+        author: author
       })
 
       await m.react('✅')
 
-      if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath)
-      if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath)
+      if (fs.existsSync(stickerPath)) fs.unlinkSync(stickerPath)
 
     } catch (e) {
       console.error(e)
@@ -106,38 +83,99 @@ export default {
   }
 }
 
-async function addExif(buffer, pack, auth) {
-    const json = {
-        'sticker-pack-id': `nino-${Date.now()}`,
-        'sticker-pack-name': pack,
-        'sticker-pack-publisher': auth,
-        'emojis': ['🦋']
+function bufferToStream(buffer) {
+  return new Readable({
+    read() {
+      this.push(buffer)
+      this.push(null)
     }
-    const exifHeader = Buffer.from([0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x41, 0x57, 0x07, 0x00])
-    const jsonBuffer = Buffer.from(JSON.stringify(json), 'utf-8')
-    const exif = Buffer.concat([exifHeader, Buffer.alloc(4), jsonBuffer])
-    exif.writeUInt32LE(jsonBuffer.length, 10)
-    return Buffer.concat([buffer, exif])
+  })
 }
 
-const buildFFmpegFilters = (args) => {
-    const effectArgs = {
-        '-blur':      'gblur=sigma=5',
-        '-sepia':     'colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131',
-        '-invert':    'negate',
-        '-grayscale': 'hue=s=0',
-        '-flip':      'hflip',
-        '-flop':      'vflip'
-    }
-    const filters = [
-        'scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=0x00000000',
-        'format=rgba'
-    ]
-    args.forEach(arg => {
-        if (effectArgs[arg]) filters.push(effectArgs[arg])
-        if (arg === '-c') filters.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte((X-256)*(X-256)+(Y-256)*(Y-256),256*256),255,0)'`)
-        if (arg === '-v') filters.push(`geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='if(lte(pow((X-256)/160,2)+pow((Y-256)/160,2)-1,3)-pow((X-256)/160,2)*pow((Y-256)/160,3),0),255,0)'`)
-    })
-    filters.push('format=yuva420p') 
-    return filters.join(',')
-                                     }
+async function imageToWebp(buffer) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+
+    ffmpeg(bufferToStream(buffer))
+      .inputFormat('jpeg')
+      .addOutputOptions([
+        "-vcodec", "libwebp",
+        "-vf", "scale=320:320:force_original_aspect_ratio=increase,crop=320:320,fps=15,format=rgba"
+      ])
+      .format('webp')
+      .on('error', reject)
+      .on('end', () => resolve(Buffer.concat(chunks)))
+      .pipe()
+      .on('data', c => chunks.push(c))
+  })
+}
+
+async function videoToWebp(buffer) {
+  return new Promise((resolve, reject) => {
+    const chunks = []
+
+    ffmpeg(bufferToStream(buffer))
+      .inputFormat('mp4')
+      .addOutputOptions([
+        "-vcodec", "libwebp",
+        "-vf", "scale=320:320:force_original_aspect_ratio=increase,crop=320:320,fps=15,format=rgba",
+        "-loop", "0",
+        "-ss", "00:00:00",
+        "-t", "00:00:05",
+        "-preset", "default",
+        "-an",
+        "-vsync", "0"
+      ])
+      .format('webp')
+      .on('error', reject)
+      .on('end', () => resolve(Buffer.concat(chunks)))
+      .pipe()
+      .on('data', c => chunks.push(c))
+  })
+}
+
+async function writeExifImg(media, metadata) {
+  const wMedia = await imageToWebp(media)
+  return await addExif(wMedia, metadata)
+}
+
+async function writeExifVid(media, metadata) {
+  const wMedia = await videoToWebp(media)
+  return await addExif(wMedia, metadata)
+}
+
+async function addExif(webpBuffer, metadata) {
+  const tmpIn = path.join(tempFolder, randomFileName("webp"))
+  const tmpOut = path.join(tempFolder, randomFileName("webp"))
+
+  fs.writeFileSync(tmpIn, webpBuffer)
+
+  const json = {
+    "sticker-pack-id": "suki-3.0",
+    "sticker-pack-name": metadata.packname,
+    "sticker-pack-publisher": metadata.author,
+    emojis: metadata.categories || [""]
+  }
+
+  const exifAttr = Buffer.from([
+    0x49,0x49,0x2A,0x00,
+    0x08,0x00,0x00,0x00,
+    0x01,0x00,0x41,0x57,
+    0x07,0x00,0x00,0x00,
+    0x00,0x00,0x16,0x00,
+    0x00,0x00
+  ])
+
+  const jsonBuff = Buffer.from(JSON.stringify(json), "utf-8")
+  const exif = Buffer.concat([exifAttr, jsonBuff])
+  exif.writeUIntLE(jsonBuff.length, 14, 4)
+
+  const img = new webp.Image()
+  await img.load(tmpIn)
+  img.exif = exif
+  await img.save(tmpOut)
+
+  fs.unlinkSync(tmpIn)
+
+  return tmpOut
+}
