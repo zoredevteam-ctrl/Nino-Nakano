@@ -114,7 +114,6 @@ async function imageToWebp(buffer, debug) {
     const chunks = []
 
     ffmpeg(bufferToStream(buffer))
-      .inputFormat('jpeg')
       .addOutputOptions([
         "-vcodec", "libwebp",
         "-vf", "scale=320:320:force_original_aspect_ratio=increase,crop=320:320,fps=15,format=rgba"
@@ -138,7 +137,6 @@ async function videoToWebp(buffer, debug) {
     const chunks = []
 
     ffmpeg(bufferToStream(buffer))
-      .inputFormat('mp4')
       .addOutputOptions([
         "-vcodec", "libwebp",
         "-vf", "scale=320:320:force_original_aspect_ratio=increase,crop=320:320,fps=15,format=rgba",
